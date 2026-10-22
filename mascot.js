@@ -55,7 +55,7 @@
 
     var jp = (ts - this.jumpAt) / 450;
     var jump = jp >= 0 && jp <= 1 ? sin(PI * jp) : 0;
-    var bob = mood === "sleep" ? sin(tt * 1.6) * 1.2 : sin(tt * 2.6) * 1.3;
+    var bob = mood === "sleep" ? sin(tt * 1.6) * 1.2 : (mood === "sport" || mood === "party") ? -Math.abs(sin(tt * 4)) * 4 : sin(tt * 2.6) * 1.3;
 
     // เงา
     c.fillStyle = "rgba(0,0,0,.18)";
@@ -64,16 +64,22 @@
     c.save();
     c.translate(0, bob - jump * 10);
     if (mood === "morning") sun(c, tt);
+    if (mood === "party") confetti(c, tt, true);
     c.fillStyle = DARK; oval(c, 39.5, 86, 6.5, 4); oval(c, 60.5, 86, 6.5, 4);
     if (mood === "sleep") { arm(c, 27, 62, 23, 72); arm(c, 73, 62, 77, 72); }
     else if (mood === "morning" || mood === "bye") arm(c, 27, 62, 22, 73);
-    antenna(c, tt);
+    else if (mood === "sport" || mood === "party") { var sh = sin(tt * 9) * 3; arm(c, 27, 58, 15 + sh, 40); arm(c, 73, 58, 85 - sh, 40); }
+    if (mood !== "party") antenna(c, tt);
     body(c);
+    if (mood === "sport") headband(c, tt);
     face(c, mood, tt, t);
     if (mood === "study") book(c, t);
     else if (mood === "eat") eating(c, t);
     else if (mood === "morning" || mood === "bye") wave(c, tt, mood);
     else if (mood === "sleep") zzz(c, tt);
+    else if (mood === "exam") exam(c, tt);
+    else if (mood === "sport") { pompom(c, 15 + sin(tt * 9) * 3, 38, tt); pompom(c, 85 - sin(tt * 9) * 3, 38, tt + 1); }
+    else if (mood === "party") { hat(c, tt); confetti(c, tt, false); }
     c.restore();
   };
 
@@ -119,6 +125,13 @@
     else if (mood === "morning" || mood === "bye") {
       if ((tt % 5) < 2.5) { happyEye(c, 41); happyEye(c, 59); }
       else { openEye(c, 41, blink, 0.6, 0); openEye(c, 59, blink, 0.6, 0); }
+    } else if (mood === "sport" || mood === "party") { happyEye(c, 41); happyEye(c, 59); }
+    else if (mood === "exam") {
+      var ex = sin(tt * 2.2) * 1.6;
+      openEye(c, 41, blink, ex, 2); openEye(c, 59, blink, ex, 2);
+      c.strokeStyle = INK; c.lineWidth = 1.8;
+      c.beginPath(); c.moveTo(35, 45.5); c.lineTo(45, 43); c.stroke();
+      c.beginPath(); c.moveTo(55, 43); c.lineTo(65, 45.5); c.stroke();
     } else if (mood === "eat") {
       if (spoonK(t) < 0.15) { happyEye(c, 41); happyEye(c, 59); }
       else { openEye(c, 41, blink, 0.8, 0.8); openEye(c, 59, blink, 0.8, 0.8); }
@@ -134,7 +147,10 @@
       var chew = k < 0.15 ? Math.abs(sin(t * 14)) * 1.6 : 0;
       var op = k > 0.55 ? (k - 0.55) / 0.45 * 4 : chew;
       c.fillStyle = INK; oval(c, 50, 65.75 + op * 0.3, 3.5, 0.75 + op * 0.7);
-    } else if (mood === "morning" || mood === "bye") {
+    } else if (mood === "exam") {
+      c.strokeStyle = INK; c.lineWidth = 1.8;
+      c.beginPath(); c.moveTo(45, 66); c.quadraticCurveTo(47.5, 64, 50, 66); c.quadraticCurveTo(52.5, 68, 55, 66); c.stroke();
+    } else if (mood === "morning" || mood === "bye" || mood === "sport" || mood === "party") {
       c.fillStyle = INK; c.beginPath(); c.moveTo(44, 63); c.quadraticCurveTo(50, 72, 56, 63); c.closePath(); c.fill();
       c.fillStyle = "#FF7A9A"; oval(c, 50, 68, 2.5, 1.5);
     } else {
@@ -230,6 +246,54 @@
     for (var i = 0; i < 8; i++) { c.beginPath(); c.moveTo(0, 7.5); c.lineTo(0, 10.5); c.stroke(); c.rotate(PI / 4); }
     c.restore();
     c.fillStyle = "#FFC53D"; circle(c, 14, 16, 5.5);
+  }
+  function exam(c, tt) {
+    c.fillStyle = "#fff"; roundRect(c, 35, 72, 65, 88, 1.5);
+    c.strokeStyle = "rgba(48,53,80,.33)"; c.lineWidth = 1;
+    for (var i = 0; i < 3; i++) { c.beginPath(); c.moveTo(38, 76 + i * 3.6); c.lineTo(62 - (i === 2 ? 8 : 0), 76 + i * 3.6); c.stroke(); }
+    arm(c, 28, 63, 37, 80);
+    var px = 46 + sin(tt * 6) * 7, py = 80 + sin(tt * 12) * 0.8;
+    c.strokeStyle = "#FFC53D"; c.lineWidth = 2.6;
+    c.beginPath(); c.moveTo(px, py); c.lineTo(px + 9, py - 8); c.stroke();
+    c.fillStyle = INK; circle(c, px, py, 1);
+    arm(c, 72, 63, px + 8, py - 6);
+    var ph = (tt * 0.8) % 1, sy = 40 + ph * 14;
+    c.fillStyle = "rgba(125,211,252," + ((1 - ph) * 0.86).toFixed(2) + ")";
+    c.beginPath(); c.moveTo(73, sy - 4); c.quadraticCurveTo(76.5, sy + 1, 73, sy + 2); c.quadraticCurveTo(69.5, sy + 1, 73, sy - 4); c.fill();
+  }
+  function headband(c, tt) {
+    c.save(); c.beginPath(); c.arc(50, 58, 28, 0, PI * 2); c.clip();
+    c.fillStyle = "#EF4444"; c.fillRect(20, 37, 60, 6.5); c.restore();
+    var f = sin(tt * 10) * 3;
+    c.strokeStyle = "#EF4444"; c.lineWidth = 2.6;
+    c.beginPath(); c.moveTo(77, 40); c.lineTo(86, 37 + f); c.stroke();
+    c.beginPath(); c.moveTo(77, 41); c.lineTo(85, 45 - f); c.stroke();
+  }
+  function pompom(c, x, y, tt) {
+    var cols = ["#FFC53D", "#FF7AB6", "#FFE08A"];
+    for (var i = 0; i < 7; i++) {
+      var a = i / 7 * 2 * PI + tt * 2;
+      c.fillStyle = cols[i % 3]; circle(c, x + cos(a) * 4.5, y + sin(a) * 4.5, 3.4);
+    }
+    c.fillStyle = "#FFD166"; circle(c, x, y, 3.6);
+  }
+  function hat(c, tt) {
+    c.save(); c.translate(50, 33); c.rotate(sin(tt * 3) * 4 * PI / 180); c.translate(-50, -33);
+    c.fillStyle = "#22C55E"; c.beginPath(); c.moveTo(40, 34); c.lineTo(50, 10); c.lineTo(60, 34); c.closePath(); c.fill();
+    c.strokeStyle = "#FFE08A"; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(44, 26); c.lineTo(56.5, 26); c.stroke();
+    c.beginPath(); c.moveTo(47, 18); c.lineTo(53.5, 18); c.stroke();
+    c.fillStyle = "#FF7AB6"; circle(c, 50, 10, 3.4);
+    c.restore();
+  }
+  function confetti(c, tt, back) {
+    var cols = ["#FF7AB6", "#FFC53D", "#22D3EE", "#A3E635", "#FFFFFF"];
+    for (var i = 0; i < 14; i++) {
+      if ((i % 2 === 0) !== back) continue;
+      var x = (i * 37 % 100) + sin(tt * 2 + i) * 3, y = ((tt * 22 + i * 17) % 110) - 8;
+      c.save(); c.translate(x, y); c.rotate((tt * 90 + i * 40) * PI / 180);
+      c.fillStyle = cols[i % cols.length]; c.fillRect(-1.6, -0.9, 3.2, 1.8); c.restore();
+    }
   }
   function zzz(c, tt) {
     c.textAlign = "center";

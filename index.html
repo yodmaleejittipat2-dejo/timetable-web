@@ -217,6 +217,26 @@ select { appearance: none; -webkit-appearance: none; border-radius: 14px; paddin
   border: 1px solid rgba(255,255,255,.35);
   -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
 }
+
+/* นับถอยหลัง */
+.cd-row { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.cd-row::-webkit-scrollbar { display: none; }
+.cd { flex: none; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 10px 16px 12px 14px; }
+.cd-n { font-size: 24px; font-weight: 700; color: var(--accent); line-height: 1.2; }
+.banner.prepb { background: var(--accent-soft); }
+.banner.prepb .b { color: var(--accent); }
+/* ปฏิกิริยา */
+.reacts { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px 12px; }
+.re { background: var(--surface2); border: 1px solid transparent; border-radius: 99px; padding: 4px 10px 5px; font-size: 14px; color: var(--text2); }
+.re.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+/* เปิดครั้งแรก */
+.onb { position: fixed; inset: 0; z-index: 70; background: rgba(10,10,24,.55); display: flex; align-items: center; justify-content: center; padding: 20px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.onb-card { background: var(--bg); color: var(--text); border-radius: 26px; padding: 20px 20px 22px; max-width: 380px; width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+.onb-card h2 { margin: 6px 0 6px; font-size: 22px; }
+.onb-card p { margin: 0 0 16px; color: var(--text2); }
+.onb-m { width: 150px; height: 150px; margin: 0 auto; border-radius: 50%; background: linear-gradient(135deg, var(--hero1), var(--hero2)); display: grid; place-items: center; }
+.onb-m .mascot { width: 130px; height: 130px; }
+:root[data-skin="glass"] .cd, :root[data-skin="glass"] .re { -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%); }
 </style>
 </head>
 <body>

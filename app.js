@@ -128,14 +128,24 @@
         var a = parseTime(p && p.s), b = parseTime(p && p.e);
         return a == null || b == null ? null : { start: a, end: b };
       }).filter(Boolean);
-      return s && e && ps.length ? { name: x.n || "ลดเวลาเรียน", start: s, end: e, minutes: x.m || (ps[0].end - ps[0].start), periods: ps } : null;
+      if (!(s && e && ps.length)) return null;
+      var mins = x.m || (ps[0].end - ps[0].start);
+      var uniform = ps.every(function (p) { return p.end - p.start === mins; });
+      return { name: x.n || "ลดเวลาเรียน", start: s, end: e, minutes: mins, periods: ps, label: uniform ? "คาบละ " + mins + " นาที" : "ปรับเวลาบางคาบ" };
     }).filter(Boolean);
+    var prep = {};
+    if (o.prep && typeof o.prep === "object") Object.keys(o.prep).forEach(function (k) { if (String(o.prep[k] || "").trim()) prep[k] = String(o.prep[k]); });
+    var events = (Array.isArray(o.events) ? o.events : []).map(function (x) {
+      var d2 = parseDate(x && x.d);
+      return d2 ? { name: x.n || "วันสำคัญ", date: d2, type: x.t || "other" } : null;
+    }).filter(Boolean);
+    var motd = o.motd && o.motd.text && parseDate(o.motd.s) && parseDate(o.motd.e) ? { text: o.motd.text, start: parseDate(o.motd.s), end: parseDate(o.motd.e) } : null;
     function str(k) { return (o[k] && String(o[k]).trim()) || d[k]; }
     return {
       school: str("school"), level: str("level"), room: str("room"), year: str("year"), term: str("term"),
       termStart: parseDate(o.termStart) || parseDate(d.termStart),
       termEnd: parseDate(o.termEnd) || parseDate(d.termEnd),
-      periods: periods, cells: cells, holidays: hol, special: special
+      periods: periods, cells: cells, holidays: hol, special: special, prep: prep, events: events, motd: motd
     };
   }
 
@@ -177,6 +187,8 @@
   }
   try { setConfig(JSON.parse(store("tt_cfg") || "null")); } catch (e) { setConfig(null); }
   try { S.posts = JSON.parse(store("tt_posts") || "[]"); } catch (e) { S.posts = []; }
+  try { S.reacts = JSON.parse(store("tt_reacts") || "[]"); } catch (e) { S.reacts = []; }
+  if (S.prefs.prep == null) S.prefs.prep = true;
   var td = dow(new Date());
   S.day = td <= 5 ? td : 1;
 
@@ -202,6 +214,34 @@
     if (d < cfg.termStart || d > cfg.termEnd) return "ปิดภาคเรียน";
     if (dow(d) >= 6) return "วันหยุดสุดสัปดาห์";
     return null;
+  }
+  function bkey(b) { return b.code || b.name; }
+  function prepFor(b) { return b.lunch ? "" : (S.cfg.prep[bkey(b)] || ""); }
+  function prepList(d) {
+    var seen = {}, out = [];
+    blocksOn(d).forEach(function (b) {
+      var p = prepFor(b);
+      if (p && !seen[bkey(b)]) { seen[bkey(b)] = 1; out.push({ title: b.title, item: p }); }
+    });
+    return out;
+  }
+  function eventsOn(d) { return S.cfg.events.filter(function (e) { return sameDay(e.date, d); }); }
+  function motdOn(d) { var m = S.cfg.motd; return m && d >= dayStart(m.start) && d <= dayStart(m.end) ? m.text : null; }
+  var EV_ICON = { exam: "📝", sport: "🏅", trip: "🚌", party: "🎉", holiday: "🏖️", term: "🎒", other: "📌" };
+  function countdowns(today) {
+    var out = S.cfg.events.filter(function (e) { return e.date >= today; }).slice();
+    if (S.cfg.termEnd >= today) out.push({ name: "ปิดภาคเรียน", date: addDays(S.cfg.termEnd, 1), type: "term" });
+    var nh = S.cfg.holidays.filter(function (h) { return h.start > today; }).sort(function (a, b) { return a.start - b.start; })[0];
+    if (nh) out.push({ name: nh.name, date: dayStart(nh.start), type: "holiday" });
+    return out.sort(function (a, b) { return a.date - b.date; }).slice(0, 8);
+  }
+  function deviceId() {
+    var id = store("tt_dev");
+    if (!id) {
+      id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
+      store("tt_dev", id);
+    }
+    return id;
   }
   function current(now) {
     if (dayOff(dayStart(now))) return null;
@@ -260,7 +300,11 @@
       S.posts = rows || [];
       store("tt_posts", JSON.stringify(S.posts));
     });
-    return Promise.all([a, b]).then(function () { S.offline = false; return true; })
+    var c2 = api("/rest/v1/post_reaction_counts?select=*").then(function (rows) {
+      S.reacts = rows || [];
+      store("tt_reacts", JSON.stringify(S.reacts));
+    }).catch(function () {});
+    return Promise.all([a, b, c2]).then(function () { S.offline = false; store("tt_sync", String(Date.now())); return true; })
       .catch(function () { S.offline = true; return false; });
   }
   function postTime(p) { var d = new Date(p.created_at); return isNaN(d) ? null : d; }
@@ -350,9 +394,25 @@
     else if (now.getHours() >= 21 || now.getHours() < 5) { mood = "sleep"; say = "ดึกแล้ว นอนหลับฝันดีนะ"; saySub = nextTxt(); }
     else if (nx && sameDay(nx.date, today)) { mood = "study"; say = "เตรียมตัวเข้าเรียนนะ"; saySub = nx.block.title + " · อีก " + duration(Math.floor((nx.time - now) / 60000)); }
     else { mood = "bye"; say = "เลิกเรียนแล้ว เดินทางปลอดภัยครับ"; saySub = "พรุ่งนี้เจอกันใหม่นะ"; }
+    var evT = eventsOn(today), exTom = eventsOn(addDays(today, 1)).filter(function (e) { return e.type === "exam"; })[0];
+    var lunchNow = cur && cur.lunch;
+    evT.forEach(function (e) {
+      if (e.type === "sport") { mood = "sport"; say = "วันนี้" + e.name + " สู้ๆ! 🏅"; }
+      else if (e.type === "party" || e.type === "trip") { mood = "party"; say = "วันนี้" + e.name + " สนุกๆ นะ! 🎉"; }
+      else if (e.type === "exam" && !lunchNow) { mood = "exam"; say = "วันนี้" + e.name + " ตั้งสติ ทำได้แน่นอน!"; }
+    });
+    if (exTom && !evT.length && (mood === "bye" || mood === "sleep" || mood === "morning")) { mood = "exam"; say = "พรุ่งนี้" + exTom.name + " อ่านหนังสือด้วยนะ 📚"; }
+    if ((mood === "bye" || (mood === "sleep" && !off)) && nx && sameDay(nx.date, addDays(today, 1))) {
+      var pl = prepList(nx.date);
+      if (pl.length) saySub = "🎒 พรุ่งนี้เตรียม: " + pl.map(function (x) { return x.item; }).join(", ");
+    }
+    var md = motdOn(today);
+    if (md) { if (!saySub) saySub = say; say = "📣 " + md; }
+    if (Date.now() < tapUntil) say = tapPhrase;
+    var heroPrep = target ? prepFor(target) : "";
 
     var spToday = off ? null : specialOn(today);
-    var spPill = spToday ? '<span class="pill warn-pill">⏱ ' + esc(spToday.name) + ' · คาบละ ' + spToday.minutes + ' นาที</span>' : '';
+    var spPill = spToday ? '<span class="pill warn-pill">⏱ ' + esc(spToday.name) + ' · ' + spToday.label + '</span>' : '';
     var heroMascot = store("tt_hero") === "mascot";
     var tDate = target ? (cur && !cur.lunch ? today : nx ? nx.date : today) : null;
     var tStr = tDate ? tDate.getFullYear() + "-" + pad(tDate.getMonth() + 1) + "-" + pad(tDate.getDate()) : "";
@@ -372,11 +432,25 @@
         '<div class="pills"><span class="pill">' + esc(tag) + '</span>' + spPill + '</div><h2 class="clamp2">' + esc(title) + '</h2>' +
         (sub ? '<div class="soft">' + esc(sub) + '</div>' : '') +
         (when ? '<div class="b" style="margin-top:10px">' + esc(when) + '</div>' : '') +
+        (heroPrep ? '<div class="b" style="margin-top:6px">🎒 เตรียม: ' + esc(heroPrep) + '</div>' : '') +
         (prog >= 0 ? '<div class="bar"><i style="width:' + Math.max(2, Math.min(100, prog * 100)) + '%"></i></div>' : '') +
         (store("tt_hint") ? '' : '<div class="hint">กดค้างเพื่อดูน้องติ๊ก ✨</div>') + '</div>';
     }
 
     h += statusHtml();
+    var lastSync = +(store("tt_sync") || 0);
+    if (lastSync && Date.now() - lastSync > 3 * 86400000) {
+      h += '<div class="status warn" style="margin-top:10px">⚠ ไม่ได้อัปเดตข้อมูลมา ' + Math.floor((Date.now() - lastSync) / 86400000) + ' วัน · ตรวจสอบอินเทอร์เน็ต แล้วเปิดแอปใหม่</div>';
+    }
+    var cds = countdowns(today);
+    if (cds.length) {
+      h += '<div class="b" style="font-size:18px;margin:18px 4px 10px">นับถอยหลัง</div><div class="cd-row">' + cds.map(function (e) {
+        var days = Math.round((dayStart(e.date) - today) / 86400000);
+        return '<div class="cd"><div class="row" style="gap:6px"><span>' + (EV_ICON[e.type] || "📌") + '</span>' +
+          (days === 0 ? '<span class="cd-n" style="font-size:22px">วันนี้!</span>' : '<span class="cd-n">' + days + '</span><span class="small muted">วัน</span>') +
+          '</div><div class="b small ellipsis" style="max-width:150px">' + esc(e.name) + '</div><div class="muted" style="font-size:11px">' + dWithDay(e.date) + '</div></div>';
+      }).join("") + '</div>';
+    }
 
     // สไลด์กิจกรรม
     var posts = S.posts.slice(0, 10);
@@ -417,6 +491,8 @@
 
   // ---------------- น้องติ๊ก + กดค้าง ----------------
   var mascotObj = null;
+  var tapPhrase = "", tapUntil = 0;
+  var PHRASES = ["สู้ๆ นะ! 💪", "เก่งมากเลย!", "อย่าลืมดื่มน้ำนะ 💧", "ง่วงจัง~ 😪", "ติ๊กๆ ต็อกๆ ⏰", "วันนี้ก็สู้ต่อไป!", "ยิ้มหน่อย 😊", "เดี๋ยวเตือนให้เองนะ!", "จั๊กจี้! 🤭"];
   function getMascot() {
     if (!mascotObj) mascotObj = window.Mascot ? new window.Mascot() : { canvas: document.createElement("div"), setMood: function () {}, jump: function () {} };
     return mascotObj;
@@ -447,7 +523,15 @@
     ["pointerup", "pointercancel", "pointerleave"].forEach(function (ev) { el.addEventListener(ev, cancel); });
     el.addEventListener("contextmenu", function (e) { e.preventDefault(); });
     if (store("tt_hero") === "mascot") {
-      el.addEventListener("click", function () { if (!suppressClick) getMascot().jump(); });
+      el.addEventListener("click", function () {
+        if (suppressClick) return;
+        getMascot().jump();
+        var opts = PHRASES.filter(function (p) { return p !== tapPhrase; });
+        tapPhrase = opts[Math.floor(Math.random() * opts.length)];
+        tapUntil = Date.now() + 2600;
+        renderHome();
+        setTimeout(function () { if (!location.hash || location.hash === "#") renderHome(); }, 2700);
+      });
     }
   }
   function toggleHero(el) {
@@ -482,9 +566,12 @@
     if (list.length) h += '<div class="small muted">' + list.filter(function (b) { return !b.lunch; }).length + " วิชา · " + hm(list[0].start) + "–" + hm(list[list.length - 1].end) + '</div>';
     h += '</div>';
     if (off) h += '<div class="banner"><div class="b">วันหยุด · ' + esc(off) + '</div><div class="small muted">วันนี้จะไม่มีการแจ้งเตือน</div></div>';
-    if (sp && list.length) h += '<div class="banner warnb"><div class="b">⏱ ' + esc(sp.name) + ' · คาบละ ' + sp.minutes + ' นาที</div>' +
+    if (sp && list.length) h += '<div class="banner warnb"><div class="b">⏱ ' + esc(sp.name) + ' · ' + sp.label + '</div>' +
       '<div class="small muted">เวลาเรียนวันนี้ไม่เหมือนปกติ เลิกเรียน ' + hm(list[list.length - 1].end) + ' น. · การแจ้งเตือนใช้เวลาใหม่ให้แล้ว</div></div>';
     var ds = date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate());
+    var pt = off ? [] : prepList(date);
+    if (pt.length) h += '<div class="banner prepb"><div class="b">🎒 ของที่ต้องเตรียม</div><div class="small muted">' +
+      pt.map(function (x) { return "• " + esc(x.title) + ": " + esc(x.item); }).join("<br>") + '</div></div>';
     if (!list.length) h += '<div class="center muted" style="padding:24px">ไม่มีคาบเรียนในวันนี้</div>';
     list.forEach(function (b) {
       var st = !isToday || off ? 0 : m >= b.end ? -1 : m >= b.start ? 1 : 0;
@@ -501,7 +588,8 @@
         '<div class="vbar" style="background:' + color(b.code) + '"></div>' +
         '<div class="grow"><div class="b ellipsis" style="font-size:16px">' + esc(b.title) + '</div>' +
         '<div class="small muted ellipsis">' + esc(line2) + '</div>' +
-        (b.teacher ? '<div class="small muted ellipsis">' + esc(b.teacher) + '</div>' : '') + '</div>' +
+        (b.teacher ? '<div class="small muted ellipsis">' + esc(b.teacher) + '</div>' : '') +
+        (prepFor(b) ? '<div class="small b ellipsis" style="color:var(--accent)">🎒 ' + esc(prepFor(b)) + '</div>' : '') + '</div>' +
         (st === 1 ? '<span class="pill accent-pill">ตอนนี้</span>' : note ? '<span class="pill soft-pill">โน้ต</span>' : '') + '</button>';
     });
     if (list.length) h += '<div class="center small muted" style="margin-top:6px">เลิกเรียน ' + hm(list[list.length - 1].end) + ' น. · แตะวิชาเพื่อดูรายละเอียด</div>';
@@ -551,7 +639,8 @@
       '<div class="tile"><div class="small muted">ห้องเรียน</div><div class="v">' + esc(b.room || "-") + '</div></div>' +
       '<div class="tile"><div class="small muted">คาบที่</div><div class="v">' + b.label + '</div></div></div>';
     if (sp) h += '<div class="banner warnb" style="margin-top:10px"><div class="b">⏱ ' + esc(sp.name) + ' · ' + dWithDay(onDate) + '</div>' +
-      '<div class="small muted">วันนั้นเรียน ' + hm(shown.start) + '–' + hm(shown.end) + ' (ปกติ ' + hm(b.start) + '–' + hm(b.end) + ') · คาบละ ' + sp.minutes + ' นาที</div></div>';
+      '<div class="small muted">วันนั้นเรียน ' + hm(shown.start) + '–' + hm(shown.end) + ' (ปกติ ' + hm(b.start) + '–' + hm(b.end) + ') · ' + sp.label + '</div></div>';
+    if (prepFor(b)) h += '<div class="banner prepb" style="margin-top:10px"><div class="b">🎒 ต้องเตรียม</div><div class="small muted">' + esc(prepFor(b)) + '</div></div>';
     h += '<div class="section">เรียนวิชานี้ในสัปดาห์</div><div class="card">' + all.map(function (x) {
       var me = x.day === b.day && x.from === b.from;
       return '<div class="lrow"><div class="grow' + (me ? " b" : "") + '">' + DAY_FULL[x.day] + '</div>' +
@@ -562,6 +651,49 @@
       '<div class="small muted" style="margin:8px 4px 0">บันทึกอัตโนมัติ</div>';
     app.innerHTML = '<div class="fade">' + h + '</div>';
     document.getElementById("note").addEventListener("input", function (e) { store(noteKey(b), e.target.value); });
+  }
+
+  // ---------------- ปฏิกิริยา ----------------
+  var EMOJIS = ["❤️", "😂", "👍", "😮", "🎉"];
+  var adj = {};
+  function myReacts() { try { return JSON.parse(store("tt_myreacts") || "{}"); } catch (e) { return {}; } }
+  function reactsHtml(pid) {
+    var mine = myReacts();
+    return EMOJIS.map(function (e) {
+      var k = pid + "|" + e;
+      var n = 0;
+      S.reacts.forEach(function (r) { if (String(r.post_id) === String(pid) && r.emoji === e) n = r.n; });
+      n = Math.max(0, n + (adj[k] || 0));
+      return '<button class="re' + (mine[k] ? " on" : "") + '" data-react="' + pid + '" data-emoji="' + e + '">' + e + (n ? " " + n : "") + '</button>';
+    }).join("");
+  }
+  function toggleReact(pid, e) {
+    var k = pid + "|" + e, mine = myReacts(), on = !mine[k];
+    if (on) mine[k] = 1; else delete mine[k];
+    store("tt_myreacts", JSON.stringify(mine));
+    adj[k] = (adj[k] || 0) + (on ? 1 : -1);
+    function redraw() {
+      var box = document.querySelector('[data-reacts="' + pid + '"]');
+      if (box) box.innerHTML = reactsHtml(pid);
+    }
+    redraw();
+    if (navigator.vibrate) { try { navigator.vibrate(8); } catch (x) {} }
+    api("/rest/v1/rpc/toggle_reaction", { method: "POST", body: JSON.stringify({ p_post: +pid, p_device: deviceId(), p_emoji: e }) })
+      .then(function (serverOn) {
+        var m = myReacts();
+        if (serverOn) m[k] = 1; else delete m[k];
+        store("tt_myreacts", JSON.stringify(m));
+        return api("/rest/v1/post_reaction_counts?select=*");
+      })
+      .then(function (rows) { S.reacts = rows || []; store("tt_reacts", JSON.stringify(S.reacts)); delete adj[k]; redraw(); })
+      .catch(function () {
+        var m = myReacts();
+        if (on) delete m[k]; else m[k] = 1;
+        store("tt_myreacts", JSON.stringify(m));
+        adj[k] = (adj[k] || 0) + (on ? -1 : 1);
+        redraw();
+        toast("กดไม่สำเร็จ ตรวจสอบอินเทอร์เน็ต");
+      });
   }
 
   // ---------------- หน้ากิจกรรม ----------------
@@ -578,7 +710,8 @@
       if (t && key !== last) { h += '<div class="section">' + relative(t) + '</div>'; last = key; }
       h += '<div class="card post"><div class="head small muted">' + (t ? hm(minsOf(t)) + " น." : "") + '</div>' +
         (p.body ? '<div class="body">' + esc(p.body) + '</div>' : '<div style="height:8px"></div>') +
-        (p.media_url ? '<div data-post="' + p.id + '">' + mediaHtml(p, 260) + '</div>' : '') + '</div>';
+        (p.media_url ? '<div data-post="' + p.id + '">' + mediaHtml(p, 260) + '</div>' : '') +
+        '<div class="reacts" data-reacts="' + p.id + '">' + reactsHtml(p.id) + '</div></div>';
     });
     app.innerHTML = '<div class="fade">' + h + '</div>';
   }
@@ -600,13 +733,14 @@
   }
   function saveSub(sub) {
     var j = sub.toJSON();
-    return api("/rest/v1/rpc/save_push_sub", {
-      method: "POST",
-      body: JSON.stringify({
-        p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth,
-        p_lead: S.prefs.lead, p_at_start: !!S.prefs.atStart, p_posts: !!S.prefs.posts
-      })
-    });
+    var base = {
+      p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth,
+      p_lead: S.prefs.lead, p_at_start: !!S.prefs.atStart, p_posts: !!S.prefs.posts
+    };
+    var withPrep = JSON.parse(JSON.stringify(base));
+    withPrep.p_prep = !!S.prefs.prep;
+    return api("/rest/v1/rpc/save_push_sub", { method: "POST", body: JSON.stringify(withPrep) })
+      .catch(function () { return api("/rest/v1/rpc/save_push_sub", { method: "POST", body: JSON.stringify(base) }); });
   }
   function enablePush() {
     return Notification.requestPermission().then(function (perm) {
@@ -704,6 +838,7 @@
         }).join("") + '</select></div>' +
         '<div class="lrow"><div class="grow"><div>เตือนอีกครั้งตอนเริ่มคาบ</div></div><label class="switch"><input type="checkbox" id="sw-start"' + (S.prefs.atStart ? " checked" : "") + '><span></span></label></div>' +
         '<div class="lrow"><div class="grow"><div>แจ้งเตือนกิจกรรมใหม่</div><div class="small muted">เมื่อแอดมินโพสต์รูปหรือวิดีโอ</div></div><label class="switch"><input type="checkbox" id="sw-posts"' + (S.prefs.posts ? " checked" : "") + '><span></span></label></div>' +
+        '<div class="lrow"><div class="grow"><div>เตือนของที่ต้องเตรียม</div><div class="small muted">20:00 น. ก่อนวันที่ต้องเตรียมของ</div></div><label class="switch"><input type="checkbox" id="sw-prep"' + (S.prefs.prep ? " checked" : "") + '><span></span></label></div>' +
         '<button class="lrow" id="btn-test"><div class="grow"><div>ทดลองแจ้งเตือนตอนนี้</div><div class="small muted">เช็กว่าเครื่องและเซิร์ฟเวอร์ส่งได้</div></div><div class="val">ลองเลย</div></button>' +
         '<button class="lrow" id="btn-test-lock"><div class="grow"><div>ทดลองตอนล็อกจอ</div><div class="small muted">กดแล้วล็อกจอทันที ภายใน 10 วินาทีจะเด้ง</div></div><div class="val">ส่งใน 10 วิ</div></button>' +
         '</div><div class="small muted" style="margin:8px 4px 0">แจ้งเตือนส่งจากเซิร์ฟเวอร์ อาจช้ากว่ากำหนดได้ไม่เกินประมาณ 1 นาที · เสียงแจ้งเตือนเป็นเสียงมาตรฐานของเครื่อง</div>';
@@ -745,6 +880,8 @@
     if (st) st.onchange = function () { S.prefs.atStart = st.checked; resavePrefs(); };
     var sp = document.getElementById("sw-posts");
     if (sp) sp.onchange = function () { S.prefs.posts = sp.checked; resavePrefs(); };
+    var spp = document.getElementById("sw-prep");
+    if (spp) spp.onchange = function () { S.prefs.prep = spp.checked; resavePrefs(); };
     var bt = document.getElementById("btn-test");
     if (bt) bt.onclick = function () { testPush(0); };
     var btl = document.getElementById("btn-test-lock");
@@ -777,6 +914,8 @@
 
   document.addEventListener("click", function (e) {
     if (suppressClick) { suppressClick = false; e.preventDefault(); e.stopPropagation(); return; }
+    var rb = e.target.closest("[data-react]");
+    if (rb) { toggleReact(rb.getAttribute("data-react"), rb.getAttribute("data-emoji")); return; }
     var el = e.target.closest("[data-media]");
     if (el) { var p = postById(el.getAttribute("data-media")); if (p && p.media_url) { openViewer(p); return; } }
     var dayBtn = e.target.closest("[data-day]");
@@ -810,7 +949,52 @@
     if (location.search) history.replaceState(null, "", location.pathname + location.hash);
   })();
 
+  // ---------------- เปิดครั้งแรก ----------------
+  function showOnboarding() {
+    if (store("tt_onb") === "1" || document.querySelector(".onb")) return;
+    var m = window.Mascot ? new window.Mascot() : null;
+    var ov = document.createElement("div");
+    ov.className = "onb";
+    function close() { store("tt_onb", "1"); ov.remove(); render(); }
+    function draw() {
+      var ps = pushState(), body, btns;
+      if (ps === "install") {
+        if (m) m.setMood("morning");
+        body = '<h2>สวัสดี! เราคือน้องติ๊ก</h2><p>จะคอยบอกว่าตอนนี้เรียนวิชาอะไร และเตือนก่อนเข้าเรียนให้นะ</p>' +
+          '<div class="card" style="text-align:left"><ol class="steps"><li>กดปุ่ม <b>แชร์</b> ⬆️ ของ Safari</li><li>เลือก <b>เพิ่มไปยังหน้าจอโฮม</b> → <b>เพิ่ม</b></li>' +
+          '<li>เปิดแอป <b>ตารางเรียน</b> จากไอคอนบนหน้าจอโฮม</li><li>กด ⚙️ แล้วเปิดการแจ้งเตือน</li></ol></div>';
+        btns = '<button class="btn" data-onb="close">เข้าใจแล้ว</button>';
+      } else if (ps === "off") {
+        if (m) m.setMood("study");
+        body = '<h2>เปิดการแจ้งเตือนกันเถอะ</h2><p>จะได้เตือนก่อนเรียน ' + S.prefs.lead + ' นาที และตอนเริ่มคาบ แม้ล็อกจออยู่</p>';
+        btns = '<button class="btn" data-onb="enable">เปิดการแจ้งเตือน</button><button class="btn soft" data-onb="close" style="margin-top:8px">ไว้ทีหลัง</button>';
+      } else if (ps === "on") {
+        if (m) m.setMood("bye");
+        body = '<h2>พร้อมแล้ว!</h2><p>ลองกดทดสอบดูว่าแจ้งเตือนเด้งไหม</p>';
+        btns = '<button class="btn soft" data-onb="test">🔔 ลองแจ้งเตือน</button><button class="btn" data-onb="close" style="margin-top:8px">เริ่มใช้งาน</button>';
+      } else {
+        if (m) m.setMood("morning");
+        body = '<h2>สวัสดี! เราคือน้องติ๊ก</h2><p>เครื่องนี้ยังไม่รองรับการแจ้งเตือน แต่ดูตารางเรียนได้ตามปกติ</p>';
+        btns = '<button class="btn" data-onb="close">เริ่มใช้งาน</button>';
+      }
+      ov.innerHTML = '<div class="onb-card"><div class="onb-m"></div>' + body + btns + '</div>';
+      if (m) ov.querySelector(".onb-m").appendChild(m.canvas);
+    }
+    ov.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-onb]");
+      if (!b) return;
+      e.stopPropagation();
+      var a = b.getAttribute("data-onb");
+      if (a === "close") close();
+      else if (a === "test") testPush(0);
+      else if (a === "enable") enablePush().then(function () { toast("เปิดการแจ้งเตือนแล้ว"); draw(); }).catch(function (er) { toast(er && er.message ? er.message : "ทำไม่สำเร็จ", 5000); });
+    });
+    draw();
+    document.body.appendChild(ov);
+  }
+
   render();
+  showOnboarding();
   sync().then(function () { render(); });
 
   // รีเฟรชทุก 30 วินาที (เวลาคาบ) และดึงข้อมูลใหม่ทุกครั้งที่กลับมาเปิดแอป
