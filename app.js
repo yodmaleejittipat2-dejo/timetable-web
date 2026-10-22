@@ -2,6 +2,7 @@
 (function () {
   "use strict";
   var C = window.TT_CONFIG || {};
+  var WEB_VERSION = "web-4";
   var app = document.getElementById("app");
   function applySkin(v) { document.documentElement.setAttribute("data-skin", v === "glass" ? "glass" : "normal"); }
   try { applySkin(localStorage.getItem("tt_skin")); } catch (e) { applySkin("normal"); }
@@ -442,7 +443,7 @@
     if (lastSync && Date.now() - lastSync > 3 * 86400000) {
       h += '<div class="status warn" style="margin-top:10px">⚠ ไม่ได้อัปเดตข้อมูลมา ' + Math.floor((Date.now() - lastSync) / 86400000) + ' วัน · ตรวจสอบอินเทอร์เน็ต แล้วเปิดแอปใหม่</div>';
     }
-    var cds = countdowns(today);
+    var cds = [];
     if (cds.length) {
       h += '<div class="b" style="font-size:18px;margin:18px 4px 10px">นับถอยหลัง</div><div class="cd-row">' + cds.map(function (e) {
         var days = Math.round((dayStart(e.date) - today) / 86400000);
@@ -860,7 +861,8 @@
         (x.start <= t ? '<span class="pill" style="background:var(--danger-soft);color:var(--danger)">ตอนนี้</span>' : '') + '</div>';
     }).join("") : '<div class="lrow muted">ไม่มีวันหยุดที่จะถึง</div>') + '</div>';
     h += '<div class="section">เกี่ยวกับ</div><div class="card"><div class="lrow"><div class="grow">ตารางเรียน ' + esc(cfg.level) + '</div><div class="val">เว็บแอป</div></div>' +
-      '<div class="lrow"><div class="grow">' + esc(cfg.school) + '</div><div class="val">ภาคเรียนที่ ' + esc(cfg.term + "/" + cfg.year) + '</div></div></div>' +
+      '<div class="lrow"><div class="grow">' + esc(cfg.school) + '</div><div class="val">ภาคเรียนที่ ' + esc(cfg.term + "/" + cfg.year) + '</div></div>' +
+      '<div class="lrow"><div class="grow">รหัสเครื่องนี้</div><div class="val">' + shortCode() + '</div></div></div>' +
       '<div class="small muted" style="margin:8px 4px 0">แอดมินแก้ไขข้อมูลได้จากแอป Android</div>';
     app.innerHTML = '<div class="fade">' + h + '</div>';
 
@@ -949,6 +951,37 @@
     if (location.search) history.replaceState(null, "", location.pathname + location.hash);
   })();
 
+  // ---------------- รายงานตัวเครื่อง (ไม่มีข้อมูลส่วนตัว) ----------------
+  function shortCode() { return deviceId().replace(/-/g, "").slice(0, 4).toUpperCase(); }
+  function deviceInfo() {
+    var ua = navigator.userAgent || "";
+    var ios = isIOS(), android = /Android/i.test(ua);
+    var model = /iPad/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ? "iPad" : /iPhone/.test(ua) ? "iPhone" : android ? "Android" : "คอมพิวเตอร์";
+    var os = "";
+    var m1 = /OS (\d+)[_.](\d+)/.exec(ua);
+    var m2 = /Android (\d+(?:\.\d+)?)/.exec(ua);
+    if (ios && m1) os = (model === "iPad" ? "iPadOS " : "iOS ") + m1[1] + "." + m1[2];
+    else if (ios) os = "iOS";
+    else if (m2) os = "Android " + m2[1];
+    else os = /Windows/.test(ua) ? "Windows" : /Mac/.test(ua) ? "macOS" : "อื่นๆ";
+    return { platform: ios ? "ios-web" : android ? "android-web" : "web", model: model, os: os };
+  }
+  function pingDevice() {
+    if (!C.url) return;
+    var last = +(store("tt_ping") || 0);
+    if (Date.now() - last < 3 * 3600000) return;
+    var d = deviceInfo();
+    var info = {
+      push: pushState(), standalone: isStandalone(), lead: S.prefs.lead, at_start: !!S.prefs.atStart,
+      posts: !!S.prefs.posts, prep: !!S.prefs.prep, skin: store("tt_skin") || "normal",
+      mascot: store("tt_hero") === "mascot", onboarded: store("tt_onb") === "1"
+    };
+    api("/rest/v1/rpc/ping_device", {
+      method: "POST",
+      body: JSON.stringify({ p_id: deviceId(), p_platform: d.platform, p_version: WEB_VERSION, p_model: d.model, p_os: d.os, p_info: info })
+    }).then(function () { store("tt_ping", String(Date.now())); }).catch(function () {});
+  }
+
   // ---------------- เปิดครั้งแรก ----------------
   function showOnboarding() {
     if (store("tt_onb") === "1" || document.querySelector(".onb")) return;
@@ -995,7 +1028,7 @@
 
   render();
   showOnboarding();
-  sync().then(function () { render(); });
+  sync().then(function () { render(); pingDevice(); });
 
   // รีเฟรชทุก 30 วินาที (เวลาคาบ) และดึงข้อมูลใหม่ทุกครั้งที่กลับมาเปิดแอป
   setInterval(function () { if (!location.hash || location.hash === "#") renderHome(); }, 30000);
