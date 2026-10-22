@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var C = window.TT_CONFIG || {};
-  var WEB_VERSION = "web-4";
+  var WEB_VERSION = "web-5";
   var app = document.getElementById("app");
   function applySkin(v) { document.documentElement.setAttribute("data-skin", v === "glass" ? "glass" : "normal"); }
   try { applySkin(localStorage.getItem("tt_skin")); } catch (e) { applySkin("normal"); }
@@ -777,7 +777,7 @@
 
   // ---------------- ทดสอบการแจ้งเตือน ----------------
   function callTest(sub, delay, retried) {
-    return fetch(C.url + "/functions/v1/class-push?test=1", {
+    return fetch(C.url + "/functions/v1/" + (C.pushFn || "class-push") + "?test=1", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ endpoint: sub.endpoint, delay: delay })
@@ -814,7 +814,13 @@
       else msg = "ส่งไม่สำเร็จ (" + (j.status || j._http) + ") " + (j.error || "");
       toast(msg, 6000);
     }).catch(function (e) {
-      toast(e && e.message === "nosub" ? "ยังไม่ได้ลงทะเบียน ลองปิดแล้วเปิดการแจ้งเตือนใหม่" : "ติดต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต", 6000);
+      if (e && e.message === "nosub") { toast("ยังไม่ได้ลงทะเบียน ลองปิดแล้วเปิดการแจ้งเตือนใหม่", 6000); return; }
+      // เช็กว่าเน็ตปกติไหม ถ้าปกติแปลว่าตัวส่งแจ้งเตือนบนเซิร์ฟเวอร์ยังตั้งค่าไม่ครบ
+      api("/rest/v1/config?select=id").then(function () {
+        toast("อินเทอร์เน็ตปกติ แต่เรียกตัวส่งแจ้งเตือนไม่ได้ · แอดมิน: ปิด Verify JWT ของ class-push ใน Supabase แล้ว Deploy ใหม่", 9000);
+      }).catch(function () {
+        toast("ติดต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต", 6000);
+      });
     });
   }
 
