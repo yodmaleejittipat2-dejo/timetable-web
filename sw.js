@@ -1,7 +1,7 @@
 // Service worker: ใช้งานออฟไลน์ + รับแจ้งเตือน
 // เปลี่ยนเลขนี้ทุกครั้งที่ออกเวอร์ชันใหม่ (แอปจะอัปเดตเอง)
-const VERSION = "web-1";
-const SHELL = ["./", "index.html", "app.js", "config.js", "manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png"];
+const VERSION = "web-2";
+const SHELL = ["./", "index.html", "app.js", "mascot.js", "config.js", "manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

@@ -3,6 +3,8 @@
   "use strict";
   var C = window.TT_CONFIG || {};
   var app = document.getElementById("app");
+  function applySkin(v) { document.documentElement.setAttribute("data-skin", v === "glass" ? "glass" : "normal"); }
+  try { applySkin(localStorage.getItem("tt_skin")); } catch (e) { applySkin("normal"); }
 
   // ---------------- เครื่องมือ ----------------
   function esc(s) {
@@ -52,12 +54,14 @@
     return m[String(code || "").charAt(0)] || "#64748B";
   }
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
-  function toast(msg) {
+  function toast(msg, ms) {
+    var old = document.querySelector(".toast");
+    if (old) old.remove();
     var t = document.createElement("div");
     t.className = "toast";
     t.textContent = msg;
     document.body.appendChild(t);
-    setTimeout(function () { t.remove(); }, 2600);
+    setTimeout(function () { t.remove(); }, ms || 2600);
   }
 
   // ---------------- ตารางเริ่มต้น (เหมือนในแอป Android) ----------------
@@ -118,28 +122,36 @@
       var s = parseDate(h.s), e = parseDate(h.e);
       return s && e ? { name: h.n || "วันหยุด", start: s, end: e } : null;
     }).filter(Boolean);
+    var special = (Array.isArray(o.special) ? o.special : []).map(function (x) {
+      var s = parseDate(x && x.s), e = parseDate(x && x.e);
+      var ps = ((x && x.periods) || []).map(function (p) {
+        var a = parseTime(p && p.s), b = parseTime(p && p.e);
+        return a == null || b == null ? null : { start: a, end: b };
+      }).filter(Boolean);
+      return s && e && ps.length ? { name: x.n || "ลดเวลาเรียน", start: s, end: e, minutes: x.m || (ps[0].end - ps[0].start), periods: ps } : null;
+    }).filter(Boolean);
     function str(k) { return (o[k] && String(o[k]).trim()) || d[k]; }
     return {
       school: str("school"), level: str("level"), room: str("room"), year: str("year"), term: str("term"),
       termStart: parseDate(o.termStart) || parseDate(d.termStart),
       termEnd: parseDate(o.termEnd) || parseDate(d.termEnd),
-      periods: periods, cells: cells, holidays: hol
+      periods: periods, cells: cells, holidays: hol, special: special
     };
   }
 
   /** รวมคาบติดกันที่เป็นวิชาเดียวกัน */
-  function buildBlocks(cfg) {
+  function buildBlocks(cfg, periods) {
     var out = [];
     for (var day = 1; day <= 5; day++) {
-      var row = cfg.cells[day - 1], list = [], i = 0;
-      while (i < row.length) {
+      var row = cfg.cells[day - 1], list = [], i = 0, n = Math.min(row.length, periods.length);
+      while (i < n) {
         var x = row[i];
         if (!x) { i++; continue; }
         var j = i;
-        while (j + 1 < row.length && row[j + 1] && JSON.stringify(row[j + 1]) === JSON.stringify(x)) j++;
+        while (j + 1 < n && row[j + 1] && JSON.stringify(row[j + 1]) === JSON.stringify(x)) j++;
         list.push({
           day: day, from: i + 1, to: j + 1, code: x.code, name: x.name, teacher: x.teacher, room: x.room,
-          lunch: x.lunch, start: cfg.periods[i].start, end: cfg.periods[j].end,
+          lunch: x.lunch, start: periods[i].start, end: periods[j].end,
           title: x.name || x.code || "ไม่มีชื่อวิชา", label: i === j ? String(i + 1) : (i + 1) + "–" + (j + 1)
         });
         i = j + 1;
@@ -160,7 +172,8 @@
 
   function setConfig(raw) {
     S.cfg = parseConfig(raw);
-    S.blocks = buildBlocks(S.cfg);
+    S.blocks = buildBlocks(S.cfg, S.cfg.periods);
+    S.cfg.special.forEach(function (sp) { sp.blocks = buildBlocks(S.cfg, sp.periods); });
   }
   try { setConfig(JSON.parse(store("tt_cfg") || "null")); } catch (e) { setConfig(null); }
   try { S.posts = JSON.parse(store("tt_posts") || "[]"); } catch (e) { S.posts = []; }
@@ -168,6 +181,18 @@
   S.day = td <= 5 ? td : 1;
 
   function blocks(day) { return (S.blocks && S.blocks[day - 1]) || []; }
+  /** วันลดเวลาเรียนของวันที่นี้ (null = เวลาปกติ) */
+  function specialOn(d) {
+    var t = dayStart(d);
+    return S.cfg.special.filter(function (x) { return t >= dayStart(x.start) && t <= dayStart(x.end); })[0] || null;
+  }
+  /** ตารางของวันที่นั้นจริงๆ (ใช้เวลาลดถ้าเป็นวันลดเวลาเรียน) */
+  function blocksOn(d) {
+    var k = dow(d);
+    if (k > 5) return [];
+    var sp = specialOn(d);
+    return sp ? (sp.blocks[k - 1] || []) : blocks(k);
+  }
   function dayOff(d) {
     var cfg = S.cfg;
     for (var i = 0; i < cfg.holidays.length; i++) {
@@ -181,14 +206,14 @@
   function current(now) {
     if (dayOff(dayStart(now))) return null;
     var m = minsOf(now);
-    return blocks(dow(now)).filter(function (b) { return m >= b.start && m < b.end; })[0] || null;
+    return blocksOn(now).filter(function (b) { return m >= b.start && m < b.end; })[0] || null;
   }
   function nextClass(now) {
     var base = dayStart(now);
     for (var i = 0; i < 400; i++) {
       var d = addDays(base, i);
       if (dayOff(d)) continue;
-      var list = blocks(dow(d));
+      var list = blocksOn(d);
       for (var k = 0; k < list.length; k++) {
         var b = list[k];
         if (b.lunch) continue;
@@ -307,13 +332,49 @@
       '<button class="icon-btn" data-go="#feed" aria-label="กิจกรรม">' + IC.feed + (unread ? '<span class="dot"></span>' : '') + '</button>' +
       '<button class="icon-btn" data-go="#settings" aria-label="ตั้งค่า">' + IC.gear + '</button></div>';
 
-    h += '<div class="hero"' + (target ? ' data-go="#d/' + target.day + '/' + target.from + '"' : '') + '>' +
-      '<div class="row"><div class="grow soft small">' + DAY_FULL[dow(today)] + " " + dLong(today) + '</div>' +
-      (target ? '<span style="width:10px;height:10px;border-radius:50%;background:' + color(target.code) + '"></span>' : '') + '</div>' +
-      '<span class="pill">' + esc(tag) + '</span><h2 class="clamp2">' + esc(title) + '</h2>' +
-      (sub ? '<div class="soft">' + esc(sub) + '</div>' : '') +
-      (when ? '<div class="b" style="margin-top:10px">' + esc(when) + '</div>' : '') +
-      (prog >= 0 ? '<div class="bar"><i style="width:' + Math.max(2, Math.min(100, prog * 100)) + '%"></i></div>' : '') + '</div>';
+    // น้องติ๊ก: ท่าทางและคำพูดตามช่วงเวลา
+    var tb = off ? [] : blocksOn(today).filter(function (x) { return !x.lunch; });
+    function nextTxt() {
+      if (!nx) return "";
+      return sameDay(nx.date, today) ? nx.block.title + " · เริ่ม " + hm(nx.block.start)
+        : sameDay(nx.date, addDays(today, 1)) ? "พรุ่งนี้ " + hm(nx.block.start) + " น. · " + nx.block.title
+        : DAY_FULL[dow(nx.date)] + " " + dShort(nx.date) + " · " + hm(nx.block.start) + " น.";
+    }
+    var mood, say, saySub;
+    if (off === "ปิดภาคเรียน") { mood = "sleep"; say = "ปิดเทอมแล้ว พักผ่อนให้เต็มที่นะ"; saySub = nx ? "เปิดเรียน " + dWithDay(nx.date) : "รอแอดมินอัปเดตวันเปิดเทอม"; }
+    else if (off === "วันหยุดสุดสัปดาห์") { mood = "sleep"; say = "วันหยุดสุดสัปดาห์ พักผ่อนเยอะๆ นะ"; saySub = nextTxt(); }
+    else if (off) { mood = "sleep"; say = "วันนี้หยุด · " + off; saySub = nextTxt(); }
+    else if (cur && !cur.lunch) { mood = "study"; say = "ตั้งใจเรียนนะ!"; saySub = cur.title + " · เหลืออีก " + duration(cur.end - m); }
+    else if (cur) { mood = "eat"; say = "กินข้าวให้อร่อยนะ!"; saySub = nx && sameDay(nx.date, today) ? "อีก " + duration(Math.floor((nx.time - now) / 60000)) + " เข้าเรียน " + nx.block.title : ""; }
+    else if (tb.length && m < tb[0].start) { mood = "morning"; say = "อรุณสวัสดิ์! วันนี้เรียน " + tb.length + " วิชา"; saySub = "คาบแรก " + tb[0].title + " · " + hm(tb[0].start); }
+    else if (now.getHours() >= 21 || now.getHours() < 5) { mood = "sleep"; say = "ดึกแล้ว นอนหลับฝันดีนะ"; saySub = nextTxt(); }
+    else if (nx && sameDay(nx.date, today)) { mood = "study"; say = "เตรียมตัวเข้าเรียนนะ"; saySub = nx.block.title + " · อีก " + duration(Math.floor((nx.time - now) / 60000)); }
+    else { mood = "bye"; say = "เลิกเรียนแล้ว เดินทางปลอดภัยครับ"; saySub = "พรุ่งนี้เจอกันใหม่นะ"; }
+
+    var spToday = off ? null : specialOn(today);
+    var spPill = spToday ? '<span class="pill warn-pill">⏱ ' + esc(spToday.name) + ' · คาบละ ' + spToday.minutes + ' นาที</span>' : '';
+    var heroMascot = store("tt_hero") === "mascot";
+    var tDate = target ? (cur && !cur.lunch ? today : nx ? nx.date : today) : null;
+    var tStr = tDate ? tDate.getFullYear() + "-" + pad(tDate.getMonth() + 1) + "-" + pad(tDate.getDate()) : "";
+    if (heroMascot) {
+      getMascot().setMood(mood);
+      h += '<div class="hero" id="hero"><div class="row"><div class="grow soft small">' + DAY_FULL[dow(today)] + " " + dLong(today) + '</div></div>' +
+        '<div class="row" style="align-items:center;gap:8px"><div id="mascot-slot" class="mascot-slot"></div>' +
+        '<div class="grow"><span class="pill" style="margin-top:0">น้องติ๊ก</span>' +
+        '<div class="say">' + esc(say) + '</div>' + (saySub ? '<div class="soft">' + esc(saySub) + '</div>' : '') + '</div></div>' +
+        (spPill ? '<div style="margin-top:8px">' + spPill + '</div>' : '') +
+        (prog >= 0 ? '<div class="bar"><i style="width:' + Math.max(2, Math.min(100, prog * 100)) + '%"></i></div>' : '') +
+        '<div class="hint">แตะเพื่อเล่นกับน้องติ๊ก · กดค้างเพื่อกลับไปดูวิชา</div></div>';
+    } else {
+      h += '<div class="hero" id="hero"' + (target ? ' data-go="#d/' + target.day + '/' + target.from + '/' + tStr + '"' : '') + '>' +
+        '<div class="row"><div class="grow soft small">' + DAY_FULL[dow(today)] + " " + dLong(today) + '</div>' +
+        (target ? '<span style="width:10px;height:10px;border-radius:50%;background:' + color(target.code) + '"></span>' : '') + '</div>' +
+        '<div class="pills"><span class="pill">' + esc(tag) + '</span>' + spPill + '</div><h2 class="clamp2">' + esc(title) + '</h2>' +
+        (sub ? '<div class="soft">' + esc(sub) + '</div>' : '') +
+        (when ? '<div class="b" style="margin-top:10px">' + esc(when) + '</div>' : '') +
+        (prog >= 0 ? '<div class="bar"><i style="width:' + Math.max(2, Math.min(100, prog * 100)) + '%"></i></div>' : '') +
+        (store("tt_hint") ? '' : '<div class="hint">กดค้างเพื่อดูน้องติ๊ก ✨</div>') + '</div>';
+    }
 
     h += statusHtml();
 
@@ -337,9 +398,9 @@
     // แถบวัน
     var dates = weekDates();
     h += '<div class="chips">' + dates.map(function (d, i) {
-      var k = i + 1, o = dayOff(d);
+      var k = i + 1, o = dayOff(d), red = !o && specialOn(d);
       return '<button class="chip' + (k === S.day ? " sel" : "") + (sameDay(d, today) ? " today" : "") + '" data-day="' + k + '">' +
-        '<div class="d">' + DAY_SHORT[k] + '</div><div class="n' + (o ? " off" : "") + '">' + (o ? "หยุด" : d.getDate()) + '</div></button>';
+        '<div class="d">' + DAY_SHORT[k] + '</div><div class="n' + (o ? " off" : red ? " red" : "") + '">' + (o ? "หยุด" : red ? "ลดเวลา" : d.getDate()) + '</div></button>';
     }).join("") + '</div>';
     h += '<div id="list">' + listHtml() + '</div>';
 
@@ -348,7 +409,59 @@
     app.innerHTML = h;
     var sl = document.getElementById("slider");
     if (sl) sl.scrollLeft = keepLeft;
+    var slot = document.getElementById("mascot-slot");
+    if (slot) slot.appendChild(getMascot().canvas);
     bindSlider();
+    bindHero();
+  }
+
+  // ---------------- น้องติ๊ก + กดค้าง ----------------
+  var mascotObj = null;
+  function getMascot() {
+    if (!mascotObj) mascotObj = window.Mascot ? new window.Mascot() : { canvas: document.createElement("div"), setMood: function () {}, jump: function () {} };
+    return mascotObj;
+  }
+  var suppressClick = false;
+  function bindHero() {
+    var el = document.getElementById("hero");
+    if (!el) return;
+    var timer = null, sx = 0, sy = 0;
+    function cancel() {
+      clearTimeout(timer); timer = null;
+      el.classList.remove("pressing");
+    }
+    el.addEventListener("pointerdown", function (e) {
+      sx = e.clientX; sy = e.clientY;
+      el.classList.add("pressing");
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        timer = null;
+        suppressClick = true;
+        el.classList.remove("pressing");
+        toggleHero(el);
+      }, 520);
+    });
+    el.addEventListener("pointermove", function (e) {
+      if (timer && (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10)) cancel();
+    });
+    ["pointerup", "pointercancel", "pointerleave"].forEach(function (ev) { el.addEventListener(ev, cancel); });
+    el.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    if (store("tt_hero") === "mascot") {
+      el.addEventListener("click", function () { if (!suppressClick) getMascot().jump(); });
+    }
+  }
+  function toggleHero(el) {
+    if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
+    store("tt_hint", "1");
+    el.classList.add("swap-out");
+    setTimeout(function () {
+      store("tt_hero", store("tt_hero") === "mascot" ? "subject" : "mascot");
+      renderHome();
+      var n = document.getElementById("hero");
+      if (n) n.classList.add("swap-in");
+      var cv = document.querySelector("#mascot-slot canvas");
+      if (cv) cv.classList.add("pop");
+    }, 240);
   }
 
   function statusHtml() {
@@ -364,11 +477,14 @@
 
   function listHtml() {
     var date = weekDates()[S.day - 1], now = new Date(), isToday = sameDay(date, now), m = minsOf(now);
-    var off = dayOff(date), list = blocks(S.day);
+    var off = dayOff(date), list = blocksOn(date), sp = off ? null : specialOn(date);
     var h = '<div class="row list-head"><div class="grow b" style="font-size:18px">' + DAY_FULL[S.day] + " " + dShort(date) + '</div>';
     if (list.length) h += '<div class="small muted">' + list.filter(function (b) { return !b.lunch; }).length + " วิชา · " + hm(list[0].start) + "–" + hm(list[list.length - 1].end) + '</div>';
     h += '</div>';
     if (off) h += '<div class="banner"><div class="b">วันหยุด · ' + esc(off) + '</div><div class="small muted">วันนี้จะไม่มีการแจ้งเตือน</div></div>';
+    if (sp && list.length) h += '<div class="banner warnb"><div class="b">⏱ ' + esc(sp.name) + ' · คาบละ ' + sp.minutes + ' นาที</div>' +
+      '<div class="small muted">เวลาเรียนวันนี้ไม่เหมือนปกติ เลิกเรียน ' + hm(list[list.length - 1].end) + ' น. · การแจ้งเตือนใช้เวลาใหม่ให้แล้ว</div></div>';
+    var ds = date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate());
     if (!list.length) h += '<div class="center muted" style="padding:24px">ไม่มีคาบเรียนในวันนี้</div>';
     list.forEach(function (b) {
       var st = !isToday || off ? 0 : m >= b.end ? -1 : m >= b.start ? 1 : 0;
@@ -380,7 +496,7 @@
       }
       var line2 = [b.code, "คาบ " + b.label].concat(b.room ? ["ห้อง " + b.room] : []).filter(Boolean).join(" · ");
       var note = store(noteKey(b));
-      h += '<button class="cls' + (st === 1 ? " now" : "") + (dim ? " past" : "") + '" data-go="#d/' + b.day + '/' + b.from + '">' +
+      h += '<button class="cls' + (st === 1 ? " now" : "") + (dim ? " past" : "") + '" data-go="#d/' + b.day + '/' + b.from + '/' + ds + '">' +
         '<div class="time"><div class="s">' + hm(b.start) + '</div><div class="e">' + hm(b.end) + '</div></div>' +
         '<div class="vbar" style="background:' + color(b.code) + '"></div>' +
         '<div class="grow"><div class="b ellipsis" style="font-size:16px">' + esc(b.title) + '</div>' +
@@ -416,9 +532,11 @@
   }
 
   // ---------------- รายละเอียดวิชา ----------------
-  function renderDetail(day, from) {
+  function renderDetail(day, from, dateStr) {
     var b = blocks(day).filter(function (x) { return x.from === from; })[0];
     if (!b) { location.hash = ""; return; }
+    var onDate = parseDate(dateStr), sp = onDate ? specialOn(onDate) : null;
+    var shown = sp ? (blocksOn(onDate).filter(function (x) { return x.from === from; })[0] || b) : b;
     var col = color(b.code);
     var all = [];
     for (var d = 1; d <= 5; d++) blocks(d).forEach(function (x) {
@@ -429,9 +547,11 @@
       (b.code ? '<span class="pill">' + esc(b.code) + '</span>' : '') + '<h2>' + esc(b.title) + '</h2>' +
       (b.teacher ? '<div style="opacity:.9;margin-top:4px">' + esc(b.teacher) + '</div>' : '') + '</div>';
     h += '<div class="tiles"><div class="tile"><div class="small muted">วัน</div><div class="v">' + DAY_FULL[b.day] + '</div></div>' +
-      '<div class="tile"><div class="small muted">เวลา</div><div class="v">' + hm(b.start) + "–" + hm(b.end) + '</div></div>' +
+      '<div class="tile"><div class="small muted">เวลา</div><div class="v">' + hm(shown.start) + "–" + hm(shown.end) + '</div></div>' +
       '<div class="tile"><div class="small muted">ห้องเรียน</div><div class="v">' + esc(b.room || "-") + '</div></div>' +
       '<div class="tile"><div class="small muted">คาบที่</div><div class="v">' + b.label + '</div></div></div>';
+    if (sp) h += '<div class="banner warnb" style="margin-top:10px"><div class="b">⏱ ' + esc(sp.name) + ' · ' + dWithDay(onDate) + '</div>' +
+      '<div class="small muted">วันนั้นเรียน ' + hm(shown.start) + '–' + hm(shown.end) + ' (ปกติ ' + hm(b.start) + '–' + hm(b.end) + ') · คาบละ ' + sp.minutes + ' นาที</div></div>';
     h += '<div class="section">เรียนวิชานี้ในสัปดาห์</div><div class="card">' + all.map(function (x) {
       var me = x.day === b.day && x.from === b.from;
       return '<div class="lrow"><div class="grow' + (me ? " b" : "") + '">' + DAY_FULL[x.day] + '</div>' +
@@ -520,6 +640,49 @@
       .catch(function () { toast("บันทึกไม่สำเร็จ ตรวจสอบอินเทอร์เน็ต"); });
   }
 
+  // ---------------- ทดสอบการแจ้งเตือน ----------------
+  function callTest(sub, delay, retried) {
+    return fetch(C.url + "/functions/v1/class-push?test=1", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: sub.endpoint, delay: delay })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) { j._http = r.status; return j; });
+    }).then(function (j) {
+      if (j._http === 404 && j.error === "not_registered" && !retried) {
+        return saveSub(sub).then(function () { return callTest(sub, delay, true); });
+      }
+      return j;
+    });
+  }
+  function testPush(delay) {
+    if (pushState() !== "on") { toast("เปิดการแจ้งเตือนก่อนนะ"); return; }
+    toast(delay ? "กำลังส่ง…" : "กำลังทดสอบ…", 8000);
+    navigator.serviceWorker.ready.then(function (reg) {
+      if (!delay) {
+        reg.showNotification("ทดลองแจ้งเตือน (ในเครื่อง)", {
+          body: "ถ้าเห็นข้อความนี้ แปลว่าเครื่องอนุญาตการแจ้งเตือนแล้ว", icon: "icon-192.png", tag: "local-test"
+        }).catch(function () {});
+      }
+      return reg.pushManager.getSubscription();
+    }).then(function (sub) {
+      if (!sub) throw new Error("nosub");
+      return callTest(sub, delay);
+    }).then(function (j) {
+      var msg;
+      if (j.ok && delay) msg = "ส่งแล้ว! ล็อกจอได้เลย ภายใน " + delay + " วินาทีจะมีแจ้งเตือนเด้ง";
+      else if (j.ok) msg = "เซิร์ฟเวอร์ส่งแจ้งเตือนสำเร็จ ✅";
+      else if (j._http === 401) msg = "เซิร์ฟเวอร์ยังตั้งค่าไม่ครบ (แอดมิน: ปิด Verify JWT ของ class-push)";
+      else if (j._http === 404 && j.error !== "not_registered") msg = "ยังไม่มีตัวส่งแจ้งเตือนบนเซิร์ฟเวอร์ (แอดมิน: สร้าง function class-push)";
+      else if (j.status === 403 || j.status === 400) msg = "คีย์แจ้งเตือนไม่ตรงกัน ลองปิดแล้วเปิดการแจ้งเตือนใหม่";
+      else if (j.status === 404 || j.status === 410) msg = "การลงทะเบียนหมดอายุ ลองปิดแล้วเปิดการแจ้งเตือนใหม่";
+      else msg = "ส่งไม่สำเร็จ (" + (j.status || j._http) + ") " + (j.error || "");
+      toast(msg, 6000);
+    }).catch(function (e) {
+      toast(e && e.message === "nosub" ? "ยังไม่ได้ลงทะเบียน ลองปิดแล้วเปิดการแจ้งเตือนใหม่" : "ติดต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต", 6000);
+    });
+  }
+
   // ---------------- ตั้งค่า ----------------
   function renderSettings() {
     var cfg = S.cfg, ps = pushState();
@@ -541,10 +704,17 @@
         }).join("") + '</select></div>' +
         '<div class="lrow"><div class="grow"><div>เตือนอีกครั้งตอนเริ่มคาบ</div></div><label class="switch"><input type="checkbox" id="sw-start"' + (S.prefs.atStart ? " checked" : "") + '><span></span></label></div>' +
         '<div class="lrow"><div class="grow"><div>แจ้งเตือนกิจกรรมใหม่</div><div class="small muted">เมื่อแอดมินโพสต์รูปหรือวิดีโอ</div></div><label class="switch"><input type="checkbox" id="sw-posts"' + (S.prefs.posts ? " checked" : "") + '><span></span></label></div>' +
-        '</div><div class="small muted" style="margin:8px 4px 0">แจ้งเตือนส่งจากเซิร์ฟเวอร์ อาจช้ากว่ากำหนดได้ไม่เกินประมาณ 1 นาที</div>';
+        '<button class="lrow" id="btn-test"><div class="grow"><div>ทดลองแจ้งเตือนตอนนี้</div><div class="small muted">เช็กว่าเครื่องและเซิร์ฟเวอร์ส่งได้</div></div><div class="val">ลองเลย</div></button>' +
+        '<button class="lrow" id="btn-test-lock"><div class="grow"><div>ทดลองตอนล็อกจอ</div><div class="small muted">กดแล้วล็อกจอทันที ภายใน 10 วินาทีจะเด้ง</div></div><div class="val">ส่งใน 10 วิ</div></button>' +
+        '</div><div class="small muted" style="margin:8px 4px 0">แจ้งเตือนส่งจากเซิร์ฟเวอร์ อาจช้ากว่ากำหนดได้ไม่เกินประมาณ 1 นาที · เสียงแจ้งเตือนเป็นเสียงมาตรฐานของเครื่อง</div>';
     }
     var t = dayStart(new Date());
     var up = cfg.holidays.filter(function (x) { return x.end >= t; }).sort(function (a, b) { return a.start - b.start; });
+    var skin = store("tt_skin") === "glass" ? "glass" : "normal";
+    h += '<div class="section">การตกแต่ง</div><div class="card"><div class="lrow"><div class="grow">รูปแบบ</div>' +
+      '<div class="seg"><button data-skin="normal" class="' + (skin === "normal" ? "on" : "") + '">ปกติ</button>' +
+      '<button data-skin="glass" class="' + (skin === "glass" ? "on" : "") + '">กระจก</button></div></div></div>' +
+      '<div class="small muted" style="margin:8px 4px 0">แบบกระจกโปร่งใส สีสันนุ่มนวล ใช้แรงเครื่องมากกว่าเล็กน้อย เหมาะกับเครื่องกลาง-แรง</div>';
     h += '<div class="section">ข้อมูลจากแอดมิน</div><div class="card">' +
       '<button class="lrow" id="btn-sync"><div class="grow">อัปเดตข้อมูลตอนนี้</div><div class="val">' + (S.offline ? "ออฟไลน์" : "อัปเดต") + '</div></button>' +
       '<div class="lrow"><div class="grow">ภาคเรียน</div><div class="val">' + dShort(cfg.termStart) + " – " + dShort(cfg.termEnd) + '</div></div></div>';
@@ -575,6 +745,19 @@
     if (st) st.onchange = function () { S.prefs.atStart = st.checked; resavePrefs(); };
     var sp = document.getElementById("sw-posts");
     if (sp) sp.onchange = function () { S.prefs.posts = sp.checked; resavePrefs(); };
+    var bt = document.getElementById("btn-test");
+    if (bt) bt.onclick = function () { testPush(0); };
+    var btl = document.getElementById("btn-test-lock");
+    if (btl) btl.onclick = function () { testPush(10); };
+    Array.prototype.forEach.call(document.querySelectorAll("[data-skin]"), function (b) {
+      if (b.tagName !== "BUTTON") return;
+      b.onclick = function () {
+        var v = b.getAttribute("data-skin");
+        store("tt_skin", v);
+        applySkin(v);
+        renderSettings();
+      };
+    });
     document.getElementById("btn-sync").onclick = function () {
       toast("กำลังอัปเดต…");
       sync().then(function (ok) { toast(ok ? "อัปเดตแล้ว" : "อัปเดตไม่ได้ ตรวจสอบอินเทอร์เน็ต"); render(); });
@@ -584,15 +767,16 @@
   // ---------------- เปลี่ยนหน้า ----------------
   function render() {
     var hsh = location.hash;
-    var m = /^#d\/(\d)\/(\d+)$/.exec(hsh);
+    var m = /^#d\/(\d)\/(\d+)(?:\/(\d{4}-\d{2}-\d{2}))?$/.exec(hsh);
     if (hsh !== "" && hsh !== "#") clearInterval(slideTimer);
-    if (m) renderDetail(+m[1], +m[2]);
+    if (m) renderDetail(+m[1], +m[2], m[3]);
     else if (hsh === "#feed") renderFeed();
     else if (hsh === "#settings") renderSettings();
     else renderHome();
   }
 
   document.addEventListener("click", function (e) {
+    if (suppressClick) { suppressClick = false; e.preventDefault(); e.stopPropagation(); return; }
     var el = e.target.closest("[data-media]");
     if (el) { var p = postById(el.getAttribute("data-media")); if (p && p.media_url) { openViewer(p); return; } }
     var dayBtn = e.target.closest("[data-day]");
@@ -616,11 +800,12 @@
     }
   });
   window.addEventListener("hashchange", function () { render(); window.scrollTo(0, 0); });
+  document.addEventListener("pointerdown", function (e) { if (!e.target.closest("#hero")) suppressClick = false; }, true);
 
   // เปิดจากการแจ้งเตือน (?d=วัน&f=คาบ หรือ ?feed)
   (function () {
     var q = new URLSearchParams(location.search);
-    if (q.get("d") && q.get("f")) location.hash = "#d/" + q.get("d") + "/" + q.get("f");
+    if (q.get("d") && q.get("f")) location.hash = "#d/" + q.get("d") + "/" + q.get("f") + (q.get("dt") ? "/" + q.get("dt") : "");
     else if (q.has("feed")) location.hash = "#feed";
     if (location.search) history.replaceState(null, "", location.pathname + location.hash);
   })();

@@ -19,13 +19,13 @@
 :root {
   --bg: #F5F6FA; --surface: #FFFFFF; --surface2: #EEF0F6; --text: #14151C; --text2: #6B7080;
   --line: #E4E6EE; --accent: #5B4CF0; --accent-soft: #ECEAFE; --hero1: #2B2780; --hero2: #7C3AED;
-  --danger: #E5484D; --danger-soft: #FDECEC;
+  --danger: #E5484D; --danger-soft: #FDECEC; --warn: #B45309; --warn-soft: #FEF3C7;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0D0E13; --surface: #181A22; --surface2: #22252F; --text: #F2F3F7; --text2: #9A9FB0;
     --line: #2A2D38; --accent: #8C7FFF; --accent-soft: #262248; --hero1: #231F6B; --hero2: #5E2BB8;
-    --danger: #FF6B6F; --danger-soft: #3A1C20;
+    --danger: #FF6B6F; --danger-soft: #3A1C20; --warn: #FBBF24; --warn-soft: #3A2A0E;
   }
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -147,11 +147,82 @@ select { appearance: none; -webkit-appearance: none; border-radius: 14px; paddin
 .toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px); transform: translateX(-50%); background: #222; color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 14px; z-index: 60; max-width: 90%; }
 .steps { padding: 6px 16px 14px; margin: 0; }
 .steps li { margin: 6px 0; }
+
+/* วันลดเวลาเรียน */
+.pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.pills .pill { margin-top: 0; }
+.warn-pill { background: #FFC53D !important; color: #3B2600 !important; }
+.banner.warnb { background: var(--warn-soft); }
+.banner.warnb .b { color: var(--warn); }
+.chip .n.red { color: var(--warn); }
+.chip.sel .n.red { color: #fff; }
+
+/* การ์ดหลัก: กดค้าง + น้องติ๊ก */
+.hero { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; transition: transform .5s ease, opacity .24s ease; touch-action: manipulation; }
+.hero.pressing { transform: scale(.975); }
+.hero.swap-out { opacity: 0; transform: scale(.96); transition: transform .24s ease, opacity .24s ease; }
+.hero.swap-in { animation: swapin .36s ease; }
+@keyframes swapin { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+.mascot-slot { width: 116px; height: 116px; flex: none; margin-left: -6px; }
+.mascot { width: 116px; height: 116px; display: block; }
+.mascot.pop { animation: pop .52s cubic-bezier(.34, 1.8, .64, 1); }
+@keyframes pop { from { transform: scale(.5); } to { transform: scale(1); } }
+.say { font-size: 20px; font-weight: 700; line-height: 1.3; margin-top: 6px; }
+.hint { font-size: 11px; color: rgba(255,255,255,.6); margin-top: 10px; }
+.seg { display: inline-flex; background: var(--surface2); border-radius: 12px; padding: 3px; gap: 2px; }
+.seg button { padding: 6px 14px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--text2); }
+.seg button.on { background: var(--accent); color: #fff; }
+
+/* แบบกระจก */
+:root[data-skin="glass"] {
+  --surface: rgba(255,255,255,.55); --surface2: rgba(255,255,255,.35); --line: rgba(255,255,255,.7);
+  --accent-soft: rgba(91,76,240,.16); --danger-soft: rgba(229,72,77,.15); --warn-soft: rgba(245,158,11,.18);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-skin="glass"] {
+    --surface: rgba(255,255,255,.09); --surface2: rgba(255,255,255,.06); --line: rgba(255,255,255,.16);
+    --accent-soft: rgba(140,127,255,.22); --danger-soft: rgba(255,107,111,.2); --warn-soft: rgba(251,191,36,.18);
+  }
+}
+:root[data-skin="glass"] body { background: transparent; }
+:root[data-skin="glass"] body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(60vmax 60vmax at 5% 4%, #C4B5FD 0%, rgba(196,181,253,0) 60%),
+    radial-gradient(55vmax 55vmax at 100% 22%, rgba(249,168,212,.9) 0%, rgba(249,168,212,0) 60%),
+    radial-gradient(65vmax 65vmax at 15% 62%, rgba(147,197,253,.85) 0%, rgba(147,197,253,0) 60%),
+    radial-gradient(55vmax 55vmax at 95% 95%, rgba(167,243,208,.8) 0%, rgba(167,243,208,0) 60%),
+    #EEEDFB;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-skin="glass"] body::before {
+    background:
+      radial-gradient(60vmax 60vmax at 5% 4%, rgba(91,33,182,.6) 0%, rgba(91,33,182,0) 60%),
+      radial-gradient(55vmax 55vmax at 100% 22%, rgba(157,23,77,.45) 0%, rgba(157,23,77,0) 60%),
+      radial-gradient(65vmax 65vmax at 15% 62%, rgba(29,78,216,.5) 0%, rgba(29,78,216,0) 60%),
+      radial-gradient(55vmax 55vmax at 95% 95%, rgba(15,118,110,.4) 0%, rgba(15,118,110,0) 60%),
+      #0A0A18;
+  }
+}
+:root[data-skin="glass"] .card, :root[data-skin="glass"] .chip, :root[data-skin="glass"] .cls,
+:root[data-skin="glass"] .slide, :root[data-skin="glass"] .tile, :root[data-skin="glass"] .icon-btn,
+:root[data-skin="glass"] .status, :root[data-skin="glass"] textarea, :root[data-skin="glass"] .banner,
+:root[data-skin="glass"] .lunch {
+  -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0));
+}
+:root[data-skin="glass"] .chip.sel { background-color: var(--accent); }
+:root[data-skin="glass"] .hero {
+  background: linear-gradient(135deg, rgba(43,39,128,.85), rgba(124,58,237,.78));
+  border: 1px solid rgba(255,255,255,.35);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+}
 </style>
 </head>
 <body>
 <div id="app"></div>
 <script src="config.js"></script>
+<script src="mascot.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
