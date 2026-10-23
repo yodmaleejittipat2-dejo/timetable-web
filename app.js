@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var C = window.TT_CONFIG || {};
-  var WEB_VERSION = "web-5";
+  var WEB_VERSION = "web-6";
   var app = document.getElementById("app");
   function applySkin(v) { document.documentElement.setAttribute("data-skin", v === "glass" ? "glass" : "normal"); }
   try { applySkin(localStorage.getItem("tt_skin")); } catch (e) { applySkin("normal"); }
