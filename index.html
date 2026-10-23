@@ -229,6 +229,17 @@ select { appearance: none; -webkit-appearance: none; border-radius: 14px; paddin
 .reacts { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px 12px; }
 .re { background: var(--surface2); border: 1px solid transparent; border-radius: 99px; padding: 4px 10px 5px; font-size: 14px; color: var(--text2); }
 .re.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+/* หน้าต่างเลือก (รูปแบบการตกแต่ง) */
+.pick { position: fixed; inset: 0; z-index: 75; background: rgba(10,10,24,.55); display: flex; align-items: center; justify-content: center; padding: 20px; animation: pickIn .16s ease-out; }
+.pick-card { background: var(--bg); color: var(--text); border-radius: 22px; padding: 18px 8px 12px; max-width: 420px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.4); border: 1px solid var(--line); }
+.pick-card h3 { margin: 2px 16px 10px; font-size: 19px; }
+.pick-opt { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 13px 16px; border-radius: 14px; font-size: 15px; }
+.pick-opt:active { background: var(--surface2); }
+.pick-opt .radio { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--text2); position: relative; }
+.pick-opt.on .radio { border-color: var(--accent); }
+.pick-opt.on .radio::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--accent); }
+.pick-note { margin: 6px 16px 4px; }
+@keyframes pickIn { from { opacity: 0; } to { opacity: 1; } }
 /* เปิดครั้งแรก */
 .onb { position: fixed; inset: 0; z-index: 70; background: rgba(10,10,24,.55); display: flex; align-items: center; justify-content: center; padding: 20px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .onb-card { background: var(--bg); color: var(--text); border-radius: 26px; padding: 20px 20px 22px; max-width: 380px; width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.35); }

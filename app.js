@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var C = window.TT_CONFIG || {};
-  var WEB_VERSION = "web-8";
+  var WEB_VERSION = "web-9";
   var app = document.getElementById("app");
   function applySkin(v) {
     var k = v === "glass" || v === "halloween" ? v : "normal";
@@ -834,6 +834,36 @@
   }
 
   // ---------------- ตั้งค่า ----------------
+  var SKIN_NAME = { normal: "ปกติ", glass: "กระจก", halloween: "🎃 ฮาโลวีน" };
+  var SKIN_OPTS = [
+    ["normal", "ปกติ", "เรียบง่าย ประหยัดแบต"],
+    ["glass", "กระจก", "โปร่งใส สีสันนุ่มนวล (เหมาะกับเครื่องกลาง-แรง)"],
+    ["halloween", "🎃 ฮาโลวีน", "คืนพระจันทร์เต็มดวง น้องติ๊กแต่งชุดผี"]
+  ];
+  /** หน้าต่างเลือกรูปแบบการตกแต่ง */
+  function pickSkin(cur) {
+    var old = document.querySelector(".pick");
+    if (old) old.remove();
+    var el = document.createElement("div");
+    el.className = "pick";
+    el.innerHTML = '<div class="pick-card" role="dialog" aria-label="รูปแบบการตกแต่ง"><h3>รูปแบบการตกแต่ง</h3>' +
+      SKIN_OPTS.map(function (o) {
+        return '<button class="pick-opt' + (o[0] === cur ? " on" : "") + '" data-v="' + o[0] + '"><span class="radio"></span>' +
+          '<span class="grow"><span class="b">' + o[1] + '</span> — <span class="muted">' + o[2] + '</span></span></button>';
+      }).join("") +
+      '<div class="small muted pick-note">เสียงแจ้งเตือนบน iPhone เป็นเสียงมาตรฐานของเครื่อง เปลี่ยนไม่ได้</div></div>';
+    function close() { el.remove(); }
+    el.onclick = function (e) { if (e.target === el) close(); };
+    Array.prototype.forEach.call(el.querySelectorAll(".pick-opt"), function (b) {
+      b.onclick = function () {
+        var v = b.getAttribute("data-v");
+        close();
+        if (v !== cur) { store("tt_skin", v); applySkin(v); renderSettings(); }
+      };
+    });
+    document.body.appendChild(el);
+  }
+
   function renderSettings() {
     var cfg = S.cfg, ps = pushState();
     var h = '<div class="row sub-top"><button class="icon-btn" data-back>' + IC.back + '</button><div class="t" style="margin-left:4px">ตั้งค่า</div></div>';
@@ -862,11 +892,8 @@
     var t = dayStart(new Date());
     var up = cfg.holidays.filter(function (x) { return x.end >= t; }).sort(function (a, b) { return a.start - b.start; });
     var skin = store("tt_skin") === "glass" || store("tt_skin") === "halloween" ? store("tt_skin") : "normal";
-    h += '<div class="section">การตกแต่ง</div><div class="card"><div class="lrow"><div class="grow">รูปแบบ</div>' +
-      '<div class="seg"><button data-skin="normal" class="' + (skin === "normal" ? "on" : "") + '">ปกติ</button>' +
-      '<button data-skin="glass" class="' + (skin === "glass" ? "on" : "") + '">กระจก</button>' +
-      '<button data-skin="halloween" class="' + (skin === "halloween" ? "on" : "") + '">🎃 ฮาโลวีน</button></div></div></div>' +
-      '<div class="small muted" style="margin:8px 4px 0">แบบกระจกโปร่งใส สีสันนุ่มนวล · แบบฮาโลวีน น้องติ๊กจะแต่งชุดผีมาขอขนม 👻 (เสียงแจ้งเตือนบน iPhone เป็นเสียงมาตรฐานของเครื่อง เปลี่ยนไม่ได้)</div>';
+    h += '<div class="section">การตกแต่ง</div><div class="card"><button class="lrow" id="btn-skin"><div class="grow">รูปแบบ</div>' +
+      '<div class="val">' + SKIN_NAME[skin] + ' ›</div></button></div>';
     h += '<div class="section">ข้อมูลจากแอดมิน</div><div class="card">' +
       '<button class="lrow" id="btn-sync"><div class="grow">อัปเดตข้อมูลตอนนี้</div><div class="val">' + (S.offline ? "ออฟไลน์" : "อัปเดต") + '</div></button>' +
       '<div class="lrow"><div class="grow">ภาคเรียน</div><div class="val">' + dShort(cfg.termStart) + " – " + dShort(cfg.termEnd) + '</div></div></div>';
@@ -904,15 +931,8 @@
     if (bt) bt.onclick = function () { testPush(0); };
     var btl = document.getElementById("btn-test-lock");
     if (btl) btl.onclick = function () { testPush(10); };
-    Array.prototype.forEach.call(document.querySelectorAll("[data-skin]"), function (b) {
-      if (b.tagName !== "BUTTON") return;
-      b.onclick = function () {
-        var v = b.getAttribute("data-skin");
-        store("tt_skin", v);
-        applySkin(v);
-        renderSettings();
-      };
-    });
+    var bs = document.getElementById("btn-skin");
+    if (bs) bs.onclick = function () { pickSkin(skin); };
     document.getElementById("btn-sync").onclick = function () {
       toast("กำลังอัปเดต…");
       sync().then(function (ok) { toast(ok ? "อัปเดตแล้ว" : "อัปเดตไม่ได้ ตรวจสอบอินเทอร์เน็ต"); render(); });
