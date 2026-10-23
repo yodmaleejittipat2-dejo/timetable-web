@@ -2,9 +2,17 @@
 (function () {
   "use strict";
   var C = window.TT_CONFIG || {};
-  var WEB_VERSION = "web-7";
+  var WEB_VERSION = "web-8";
   var app = document.getElementById("app");
-  function applySkin(v) { document.documentElement.setAttribute("data-skin", v === "glass" ? "glass" : "normal"); }
+  function applySkin(v) {
+    var k = v === "glass" || v === "halloween" ? v : "normal";
+    document.documentElement.setAttribute("data-skin", k);
+    var tc = document.querySelectorAll('meta[name="theme-color"]');
+    for (var i = 0; i < tc.length; i++) {
+      if (!tc[i].getAttribute("data-orig")) tc[i].setAttribute("data-orig", tc[i].getAttribute("content"));
+      tc[i].setAttribute("content", k === "halloween" ? "#0E0620" : tc[i].getAttribute("data-orig"));
+    }
+  }
   try { applySkin(localStorage.getItem("tt_skin")); } catch (e) { applySkin("normal"); }
 
   // ---------------- เครื่องมือ ----------------
@@ -421,7 +429,7 @@
       getMascot().setMood(mood);
       h += '<div class="hero" id="hero"><div class="row"><div class="grow soft small">' + DAY_FULL[dow(today)] + " " + dLong(today) + '</div></div>' +
         '<div class="row" style="align-items:center;gap:8px"><div id="mascot-slot" class="mascot-slot"></div>' +
-        '<div class="grow"><span class="pill" style="margin-top:0">น้องติ๊ก</span>' +
+        '<div class="grow"><span class="pill" style="margin-top:0">' + (document.documentElement.getAttribute("data-skin") === "halloween" ? "👻 น้องติ๊กผีน้อย" : "น้องติ๊ก") + '</span>' +
         '<div class="say">' + esc(say) + '</div>' + (saySub ? '<div class="soft">' + esc(saySub) + '</div>' : '') + '</div></div>' +
         (spPill ? '<div style="margin-top:8px">' + spPill + '</div>' : '') +
         (prog >= 0 ? '<div class="bar"><i style="width:' + Math.max(2, Math.min(100, prog * 100)) + '%"></i></div>' : '') +
@@ -493,6 +501,7 @@
   // ---------------- น้องติ๊ก + กดค้าง ----------------
   var mascotObj = null;
   var tapPhrase = "", tapUntil = 0;
+  var SPOOKY = ["Trick or Treat! 🎃", "ขอขนมหน่อยน้า~ 🍬", "บู้ววว~ ตกใจไหม 👻", "ไม่ให้ขนม หลอกนะ! 😈", "ชุดผีน่ารักไหม? 👻", "ถังขนมยังไม่เต็มเลย 🍭", "แฮปปี้ฮาโลวีน! 🦇", "ผีน้อยตั้งใจเรียนนะ 📚"];
   var PHRASES = ["สู้ๆ นะ! 💪", "เก่งมากเลย!", "อย่าลืมดื่มน้ำนะ 💧", "ง่วงจัง~ 😪", "ติ๊กๆ ต็อกๆ ⏰", "วันนี้ก็สู้ต่อไป!", "ยิ้มหน่อย 😊", "เดี๋ยวเตือนให้เองนะ!", "จั๊กจี้! 🤭"];
   function getMascot() {
     if (!mascotObj) mascotObj = window.Mascot ? new window.Mascot() : { canvas: document.createElement("div"), setMood: function () {}, jump: function () {} };
@@ -527,7 +536,7 @@
       el.addEventListener("click", function () {
         if (suppressClick) return;
         getMascot().jump();
-        var opts = PHRASES.filter(function (p) { return p !== tapPhrase; });
+        var opts = (document.documentElement.getAttribute("data-skin") === "halloween" ? SPOOKY : PHRASES).filter(function (p) { return p !== tapPhrase; });
         tapPhrase = opts[Math.floor(Math.random() * opts.length)];
         tapUntil = Date.now() + 2600;
         renderHome();
@@ -852,11 +861,12 @@
     }
     var t = dayStart(new Date());
     var up = cfg.holidays.filter(function (x) { return x.end >= t; }).sort(function (a, b) { return a.start - b.start; });
-    var skin = store("tt_skin") === "glass" ? "glass" : "normal";
+    var skin = store("tt_skin") === "glass" || store("tt_skin") === "halloween" ? store("tt_skin") : "normal";
     h += '<div class="section">การตกแต่ง</div><div class="card"><div class="lrow"><div class="grow">รูปแบบ</div>' +
       '<div class="seg"><button data-skin="normal" class="' + (skin === "normal" ? "on" : "") + '">ปกติ</button>' +
-      '<button data-skin="glass" class="' + (skin === "glass" ? "on" : "") + '">กระจก</button></div></div></div>' +
-      '<div class="small muted" style="margin:8px 4px 0">แบบกระจกโปร่งใส สีสันนุ่มนวล ใช้แรงเครื่องมากกว่าเล็กน้อย เหมาะกับเครื่องกลาง-แรง</div>';
+      '<button data-skin="glass" class="' + (skin === "glass" ? "on" : "") + '">กระจก</button>' +
+      '<button data-skin="halloween" class="' + (skin === "halloween" ? "on" : "") + '">🎃 ฮาโลวีน</button></div></div></div>' +
+      '<div class="small muted" style="margin:8px 4px 0">แบบกระจกโปร่งใส สีสันนุ่มนวล · แบบฮาโลวีน น้องติ๊กจะแต่งชุดผีมาขอขนม 👻 (เสียงแจ้งเตือนบน iPhone เป็นเสียงมาตรฐานของเครื่อง เปลี่ยนไม่ได้)</div>';
     h += '<div class="section">ข้อมูลจากแอดมิน</div><div class="card">' +
       '<button class="lrow" id="btn-sync"><div class="grow">อัปเดตข้อมูลตอนนี้</div><div class="val">' + (S.offline ? "ออฟไลน์" : "อัปเดต") + '</div></button>' +
       '<div class="lrow"><div class="grow">ภาคเรียน</div><div class="val">' + dShort(cfg.termStart) + " – " + dShort(cfg.termEnd) + '</div></div></div>';

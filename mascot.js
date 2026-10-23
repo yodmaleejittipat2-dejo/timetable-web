@@ -3,6 +3,7 @@
   "use strict";
   var PI = Math.PI, sin = Math.sin, cos = Math.cos;
   var INK = "#1B1840", DARK = "#3F2BB0", ARM = "#6A50E8", ORANGE = "#FFB547", CHEEK = "rgba(255,143,177,.55)";
+  var EYE = INK; // สีเส้นตา (ชุดผีใช้สีขาวเพราะอยู่ในรูตาสีเข้ม)
 
   function ease(x) { var v = Math.max(0, Math.min(1, x)); return v * v * (3 - 2 * v); }
   function spoonK(t) {
@@ -63,6 +64,9 @@
 
     c.save();
     c.translate(0, bob - jump * 10);
+    var costume = document.documentElement.getAttribute("data-skin") === "halloween";
+    EYE = costume ? "#fff" : INK;
+    if (costume) { ghost(c, mood, tt, t); c.restore(); return; }
     if (mood === "morning") sun(c, tt);
     if (mood === "party") confetti(c, tt, true);
     c.fillStyle = DARK; oval(c, 39.5, 86, 6.5, 4); oval(c, 60.5, 86, 6.5, 4);
@@ -105,11 +109,11 @@
     c.fillStyle = "rgba(255,255,255,.18)"; oval(c, 41.5, 43.5, 8.5, 6.5);
   }
   function happyEye(c, x) {
-    c.strokeStyle = INK; c.lineWidth = 2.4;
+    c.strokeStyle = EYE; c.lineWidth = 2.4;
     c.beginPath(); c.moveTo(x - 5, 56); c.quadraticCurveTo(x, 49, x + 5, 56); c.stroke();
   }
   function sleepEye(c, x) {
-    c.strokeStyle = INK; c.lineWidth = 2.2;
+    c.strokeStyle = EYE; c.lineWidth = 2.2;
     c.beginPath(); c.moveTo(x - 5, 53); c.quadraticCurveTo(x, 58, x + 5, 53); c.stroke();
   }
   function openEye(c, x, open, lx, ly) {
@@ -129,7 +133,7 @@
     else if (mood === "exam") {
       var ex = sin(tt * 2.2) * 1.6;
       openEye(c, 41, blink, ex, 2); openEye(c, 59, blink, ex, 2);
-      c.strokeStyle = INK; c.lineWidth = 1.8;
+      c.strokeStyle = EYE === INK ? INK : "#6B5A99"; c.lineWidth = 1.8;
       c.beginPath(); c.moveTo(35, 45.5); c.lineTo(45, 43); c.stroke();
       c.beginPath(); c.moveTo(55, 43); c.lineTo(65, 45.5); c.stroke();
     } else if (mood === "eat") {
@@ -294,6 +298,75 @@
       c.save(); c.translate(x, y); c.rotate((tt * 90 + i * 40) * PI / 180);
       c.fillStyle = cols[i % cols.length]; c.fillRect(-1.6, -0.9, 3.2, 1.8); c.restore();
     }
+  }
+  // ---------- ชุดผีฮาโลวีน ----------
+  function ghost(c, mood, tt, t) {
+    bat(c, 16 + sin(tt * 0.9) * 6, 22 + sin(tt * 1.7) * 4, 7, tt * 13);
+    bat(c, 84 + sin(tt * 1.1 + 2) * 5, 16 + sin(tt * 1.4 + 1) * 3, 5, tt * 15 + 1);
+    c.beginPath();
+    c.moveTo(21, 86); c.lineTo(22, 58); c.bezierCurveTo(22, 22, 78, 22, 78, 58); c.lineTo(79, 86);
+    for (var k = 0; k < 4; k++) {
+      var x1 = 79 - k * 14.5, x2 = x1 - 14.5;
+      c.quadraticCurveTo((x1 + x2) / 2, 93 + sin(tt * 3.2 + k * 1.3) * 2.2, x2, 86 + sin(tt * 3.2 + k + 0.7) * 0.8);
+    }
+    c.closePath();
+    var g = c.createLinearGradient(50, 26, 50, 92);
+    g.addColorStop(0, "#FFFFFF"); g.addColorStop(1, "#DCD5F0");
+    c.fillStyle = g; c.fill();
+    c.strokeStyle = "rgba(63,43,176,.12)"; c.lineWidth = 1.4;
+    c.beginPath(); c.moveTo(31, 72); c.lineTo(29, 85); c.stroke();
+    c.beginPath(); c.moveTo(69, 72); c.lineTo(71, 85); c.stroke();
+    c.fillStyle = "rgba(255,255,255,.4)"; oval(c, 38, 39, 8, 6);
+    antenna(c, tt);
+    c.fillStyle = "#221A45"; oval(c, 41, 54, 7.5, 8); oval(c, 59, 54, 7.5, 8);
+    face(c, mood, tt, t);
+    var wv = sin(tt * 5) * 5;
+    sleeve(c, 25, 63, 14, 52 + wv);
+    sleeve(c, 75, 64, 82, 70);
+    pail(c, 83, 70, tt);
+    if (mood === "sleep") zzz(c, tt);
+    if (mood === "party") confetti(c, tt, false);
+  }
+  function sleeve(c, x1, y1, x2, y2) {
+    c.strokeStyle = "#EDE8F8"; c.lineWidth = 7;
+    c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+    c.fillStyle = "#F6F3FC"; circle(c, x2, y2, 4.2);
+  }
+  function pail(c, hx, hy, tt) {
+    c.save(); c.translate(hx, hy); c.rotate(sin(tt * 2.4) * 9 * PI / 180); c.translate(-hx, -hy);
+    var cx = hx, cy = hy + 11, hop = Math.abs(sin(tt * 3)) * 1.6;
+    c.strokeStyle = "#3B2A1A"; c.lineWidth = 1.4;
+    c.beginPath(); c.ellipse(cx, (hy - 1 + cy + 2) / 2, 7, (cy + 3 - hy) / 2, 0, PI, 2 * PI); c.stroke();
+    c.fillStyle = "#FF7AB6"; circle(c, cx - 3.5, cy - 5.5 - hop, 2.6);
+    c.fillStyle = "#22D3EE"; circle(c, cx + 2.5, cy - 6 - hop * 0.6, 2.4);
+    c.fillStyle = "#A3E635"; circle(c, cx + 0.2, cy - 7.6 - hop * 1.2, 2.2);
+    c.strokeStyle = "#fff"; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(cx + 4.5, cy - 4); c.lineTo(cx + 6.5, cy - 12 - hop); c.stroke();
+    c.fillStyle = "#FFC53D"; circle(c, cx + 6.8, cy - 13.5 - hop, 2.6);
+    c.fillStyle = "#F97316"; oval(c, cx, cy + 0.75, 8.5, 6.25);
+    c.fillStyle = "#EA580C"; oval(c, cx, cy + 0.75, 3, 6.25);
+    c.fillStyle = "#C2410C"; oval(c, cx, cy - 5, 8.5, 1.5);
+    c.fillStyle = "#3B1300";
+    c.beginPath();
+    c.moveTo(cx - 5.2, cy + 0.5); c.lineTo(cx - 3.4, cy - 2.2); c.lineTo(cx - 1.6, cy + 0.5); c.closePath();
+    c.moveTo(cx + 5.2, cy + 0.5); c.lineTo(cx + 3.4, cy - 2.2); c.lineTo(cx + 1.6, cy + 0.5); c.closePath();
+    c.moveTo(cx - 4.5, cy + 2.4); c.quadraticCurveTo(cx, cy + 7, cx + 4.5, cy + 2.4); c.quadraticCurveTo(cx, cy + 4.2, cx - 4.5, cy + 2.4); c.closePath();
+    c.fill();
+    c.restore();
+  }
+  function bat(c, cx, cy, s, ft) {
+    var f = sin(ft) * 0.55;
+    c.fillStyle = "rgba(32,18,56,.9)";
+    c.beginPath();
+    c.moveTo(cx, cy);
+    c.quadraticCurveTo(cx - s * 0.5, cy - s * (0.5 + f), cx - s, cy - s * (0.15 + f));
+    c.quadraticCurveTo(cx - s * 0.7, cy + s * 0.1, cx - s * 0.45, cy + s * 0.2);
+    c.quadraticCurveTo(cx - s * 0.25, cy + s * 0.05, cx, cy + s * 0.32);
+    c.quadraticCurveTo(cx + s * 0.25, cy + s * 0.05, cx + s * 0.45, cy + s * 0.2);
+    c.quadraticCurveTo(cx + s * 0.7, cy + s * 0.1, cx + s, cy - s * (0.15 + f));
+    c.quadraticCurveTo(cx + s * 0.5, cy - s * (0.5 + f), cx, cy);
+    c.closePath(); c.fill();
+    c.fillStyle = "#FFD166"; circle(c, cx - s * 0.12, cy + s * 0.05, s * 0.07); circle(c, cx + s * 0.12, cy + s * 0.05, s * 0.07);
   }
   function zzz(c, tt) {
     c.textAlign = "center";
