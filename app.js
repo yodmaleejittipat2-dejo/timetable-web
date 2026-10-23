@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var C = window.TT_CONFIG || {};
-  var WEB_VERSION = "web-6";
+  var WEB_VERSION = "web-7";
   var app = document.getElementById("app");
   function applySkin(v) { document.documentElement.setAttribute("data-skin", v === "glass" ? "glass" : "normal"); }
   try { applySkin(localStorage.getItem("tt_skin")); } catch (e) { applySkin("normal"); }
@@ -974,18 +974,20 @@
   }
   function pingDevice() {
     if (!C.url) return;
+    // รายงานทุกครั้งที่เปิดแอป (เว้นอย่างน้อย 10 นาที) · ถ้าเวอร์ชัน/การตั้งค่าเปลี่ยน รายงานทันที
     var last = +(store("tt_ping") || 0);
-    if (Date.now() - last < 3 * 3600000) return;
     var d = deviceInfo();
     var info = {
       push: pushState(), standalone: isStandalone(), lead: S.prefs.lead, at_start: !!S.prefs.atStart,
       posts: !!S.prefs.posts, prep: !!S.prefs.prep, skin: store("tt_skin") || "normal",
       mascot: store("tt_hero") === "mascot", onboarded: store("tt_onb") === "1"
     };
+    var sig = WEB_VERSION + "|" + JSON.stringify(info);
+    if (Date.now() - last < 10 * 60000 && sig === store("tt_ping_sig")) return;
     api("/rest/v1/rpc/ping_device", {
       method: "POST",
       body: JSON.stringify({ p_id: deviceId(), p_platform: d.platform, p_version: WEB_VERSION, p_model: d.model, p_os: d.os, p_info: info })
-    }).then(function () { store("tt_ping", String(Date.now())); }).catch(function () {});
+    }).then(function () { store("tt_ping", String(Date.now())); store("tt_ping_sig", sig); }).catch(function () {});
   }
 
   // ---------------- เปิดครั้งแรก ----------------
@@ -1039,7 +1041,7 @@
   // รีเฟรชทุก 30 วินาที (เวลาคาบ) และดึงข้อมูลใหม่ทุกครั้งที่กลับมาเปิดแอป
   setInterval(function () { if (!location.hash || location.hash === "#") renderHome(); }, 30000);
   document.addEventListener("visibilitychange", function () {
-    if (!document.hidden) sync().then(function () { if (!document.getElementById("note")) render(); });
+    if (!document.hidden) sync().then(function () { if (!document.getElementById("note")) render(); pingDevice(); });
   });
 
   // ตัวช่วยออฟไลน์ + อัปเดตแอปอัตโนมัติ

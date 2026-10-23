@@ -1,6 +1,6 @@
 // Service worker: ใช้งานออฟไลน์ + รับแจ้งเตือน
 // เปลี่ยนเลขนี้ทุกครั้งที่ออกเวอร์ชันใหม่ (แอปจะอัปเดตเอง)
-const VERSION = "web-6";
+const VERSION = "web-7";
 const SHELL = ["./", "index.html", "app.js", "mascot.js", "config.js", "manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", (e) => {
