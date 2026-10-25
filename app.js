@@ -2,15 +2,22 @@
 (function () {
   "use strict";
   var C = window.TT_CONFIG || {};
-  var WEB_VERSION = "web-9";
+  var WEB_VERSION = "web-10";
   var app = document.getElementById("app");
+  var SKINS = ["normal", "glass", "glass-clear", "glass-blur", "halloween"];
   function applySkin(v) {
-    var k = v === "glass" || v === "halloween" ? v : "normal";
-    document.documentElement.setAttribute("data-skin", k);
+    v = SKINS.indexOf(v) >= 0 ? v : "normal";
+    var k = v.indexOf("glass") === 0 ? "glass" : v;
+    var de = document.documentElement;
+    de.setAttribute("data-skin", k);
+    de.setAttribute("data-glass", v === "glass-clear" ? "clear" : v === "glass-blur" ? "blur" : "frosted");
+    var gm = "dark";
+    try { gm = localStorage.getItem("tt_gmode") === "light" ? "light" : "dark"; } catch (e) {}
+    de.setAttribute("data-gmode", gm);
     var tc = document.querySelectorAll('meta[name="theme-color"]');
     for (var i = 0; i < tc.length; i++) {
       if (!tc[i].getAttribute("data-orig")) tc[i].setAttribute("data-orig", tc[i].getAttribute("content"));
-      tc[i].setAttribute("content", k === "halloween" ? "#0E0620" : tc[i].getAttribute("data-orig"));
+      tc[i].setAttribute("content", k === "halloween" ? "#0E0620" : k === "glass" ? (gm === "light" ? "#F1EDFC" : "#170B36") : tc[i].getAttribute("data-orig"));
     }
   }
   try { applySkin(localStorage.getItem("tt_skin")); } catch (e) { applySkin("normal"); }
@@ -834,10 +841,35 @@
   }
 
   // ---------------- ตั้งค่า ----------------
-  var SKIN_NAME = { normal: "ปกติ", glass: "กระจก", halloween: "🎃 ฮาโลวีน" };
+  var SKIN_NAME = { normal: "ปกติ", glass: "กระจกฝ้า", "glass-clear": "กระจกใส", "glass-blur": "กระจกเบลอ", halloween: "🎃 ฮาโลวีน" };
+  /** เลือกโหมดของธีมกระจก */
+  function pickGlassMode(cur) {
+    var old = document.querySelector(".pick");
+    if (old) old.remove();
+    var el = document.createElement("div");
+    el.className = "pick";
+    var opts = [["dark", "มืด", "ไล่สีม่วงกับดำ"], ["light", "สว่าง", "ม่วงอ่อนพาสเทล"]];
+    el.innerHTML = '<div class="pick-card" role="dialog" aria-label="โหมดกระจก"><h3>โหมดกระจก</h3>' +
+      opts.map(function (o) {
+        return '<button class="pick-opt' + (o[0] === cur ? " on" : "") + '" data-v="' + o[0] + '"><span class="radio"></span>' +
+          '<span class="grow"><span class="b">' + o[1] + '</span> — <span class="muted">' + o[2] + '</span></span></button>';
+      }).join("") + '</div>';
+    el.onclick = function (e) { if (e.target === el) el.remove(); };
+    Array.prototype.forEach.call(el.querySelectorAll(".pick-opt"), function (b) {
+      b.onclick = function () {
+        el.remove();
+        store("tt_gmode", b.getAttribute("data-v"));
+        applySkin(store("tt_skin"));
+        renderSettings();
+      };
+    });
+    document.body.appendChild(el);
+  }
   var SKIN_OPTS = [
     ["normal", "ปกติ", "เรียบง่าย ประหยัดแบต"],
-    ["glass", "กระจก", "โปร่งใส สีสันนุ่มนวล (เหมาะกับเครื่องกลาง-แรง)"],
+    ["glass", "กระจกฝ้า", "ขุ่นนุ่ม อ่านง่ายที่สุด"],
+    ["glass-clear", "กระจกใส", "เห็นภาพด้านหลังชัด ขอบสะท้อนแสง"],
+    ["glass-blur", "กระจกเบลอ", "เบลอกลางๆ โทนเข้มนุ่ม"],
     ["halloween", "🎃 ฮาโลวีน", "คืนพระจันทร์เต็มดวง น้องติ๊กแต่งชุดผี"]
   ];
   /** หน้าต่างเลือกรูปแบบการตกแต่ง */
@@ -891,9 +923,12 @@
     }
     var t = dayStart(new Date());
     var up = cfg.holidays.filter(function (x) { return x.end >= t; }).sort(function (a, b) { return a.start - b.start; });
-    var skin = store("tt_skin") === "glass" || store("tt_skin") === "halloween" ? store("tt_skin") : "normal";
+    var skin = SKINS.indexOf(store("tt_skin")) >= 0 ? store("tt_skin") : "normal";
+    var gmNow = store("tt_gmode") === "light" ? "light" : "dark";
     h += '<div class="section">การตกแต่ง</div><div class="card"><button class="lrow" id="btn-skin"><div class="grow">รูปแบบ</div>' +
-      '<div class="val">' + SKIN_NAME[skin] + ' ›</div></button></div>';
+      '<div class="val">' + SKIN_NAME[skin] + ' ›</div></button>' +
+      (skin.indexOf("glass") === 0 ? '<button class="lrow" id="btn-gmode"><div class="grow">โหมดกระจก</div><div class="val">' + (gmNow === "light" ? "สว่าง" : "มืด") + ' ›</div></button>' : '') +
+      '</div>';
     h += '<div class="section">ข้อมูลจากแอดมิน</div><div class="card">' +
       '<button class="lrow" id="btn-sync"><div class="grow">อัปเดตข้อมูลตอนนี้</div><div class="val">' + (S.offline ? "ออฟไลน์" : "อัปเดต") + '</div></button>' +
       '<div class="lrow"><div class="grow">ภาคเรียน</div><div class="val">' + dShort(cfg.termStart) + " – " + dShort(cfg.termEnd) + '</div></div></div>';
@@ -933,6 +968,8 @@
     if (btl) btl.onclick = function () { testPush(10); };
     var bs = document.getElementById("btn-skin");
     if (bs) bs.onclick = function () { pickSkin(skin); };
+    var bg = document.getElementById("btn-gmode");
+    if (bg) bg.onclick = function () { pickGlassMode(gmNow); };
     document.getElementById("btn-sync").onclick = function () {
       toast("กำลังอัปเดต…");
       sync().then(function (ok) { toast(ok ? "อัปเดตแล้ว" : "อัปเดตไม่ได้ ตรวจสอบอินเทอร์เน็ต"); render(); });

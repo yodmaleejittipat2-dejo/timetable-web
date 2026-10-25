@@ -173,50 +173,87 @@ select { appearance: none; -webkit-appearance: none; border-radius: 14px; paddin
 .seg button { padding: 6px 14px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--text2); }
 .seg button.on { background: var(--accent); color: #fff; }
 
-/* แบบกระจก */
+/* ธีมกระจก: การ์ดเบลอภาพพื้นหลังจริง 3 แบบ (ฝ้า / ใส / เบลอ) */
 :root[data-skin="glass"] {
-  --surface: rgba(255,255,255,.55); --surface2: rgba(255,255,255,.35); --line: rgba(255,255,255,.7);
-  --accent-soft: rgba(91,76,240,.16); --danger-soft: rgba(229,72,77,.15); --warn-soft: rgba(245,158,11,.18);
+  color-scheme: dark;
+  --bg: #1D1B2C; --surface: rgba(255,255,255,.12); --surface2: rgba(255,255,255,.16); --text: #fff; --text2: rgba(255,255,255,.84);
+  --line: rgba(255,255,255,.28); --accent: #fff; --accent-soft: rgba(255,255,255,.22); --hero1: #2B2780; --hero2: #7C3AED;
+  --danger: #FFC9CB; --danger-soft: rgba(255,107,111,.32); --warn: #FFE29A; --warn-soft: rgba(245,158,11,.28);
+  --g-blur: 28px; --g-sat: 140%; --g-tint: rgba(255,255,255,.14); --g-shade: rgba(0,0,0,.12); --g-edge: rgba(255,255,255,.55); --g-sheen: rgba(255,255,255,.16);
 }
-@media (prefers-color-scheme: dark) {
-  :root[data-skin="glass"] {
-    --surface: rgba(255,255,255,.09); --surface2: rgba(255,255,255,.06); --line: rgba(255,255,255,.16);
-    --accent-soft: rgba(140,127,255,.22); --danger-soft: rgba(255,107,111,.2); --warn-soft: rgba(251,191,36,.18);
-  }
-}
-:root[data-skin="glass"] body { background: transparent; }
+:root[data-skin="glass"][data-glass="clear"] { --g-blur: 2.5px; --g-sat: 180%; --g-tint: rgba(255,255,255,.05); --g-shade: rgba(0,0,0,.16); --g-edge: rgba(255,255,255,.9); --g-sheen: rgba(255,255,255,.22); }
+:root[data-skin="glass"][data-glass="blur"] { --g-blur: 14px; --g-sat: 120%; --g-tint: rgba(255,255,255,.04); --g-shade: rgba(16,16,26,.2); --g-edge: rgba(255,255,255,.42); --g-sheen: rgba(255,255,255,.1); }
+
+:root[data-skin="glass"], :root[data-skin="glass"] body { background: transparent; }
+:root[data-skin="glass"] { background-color: #1D1B2C; }
 :root[data-skin="glass"] body::before {
   content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background:
-    radial-gradient(60vmax 60vmax at 5% 4%, #C4B5FD 0%, rgba(196,181,253,0) 60%),
-    radial-gradient(55vmax 55vmax at 100% 22%, rgba(249,168,212,.9) 0%, rgba(249,168,212,0) 60%),
-    radial-gradient(65vmax 65vmax at 15% 62%, rgba(147,197,253,.85) 0%, rgba(147,197,253,0) 60%),
-    radial-gradient(55vmax 55vmax at 95% 95%, rgba(167,243,208,.8) 0%, rgba(167,243,208,0) 60%),
-    #EEEDFB;
+    radial-gradient(62vmax 62vmax at 12% 16%, rgba(124,58,237,.6) 0%, rgba(124,58,237,0) 60%),
+    radial-gradient(55vmax 55vmax at 95% 38%, rgba(192,38,211,.4) 0%, rgba(192,38,211,0) 60%),
+    radial-gradient(65vmax 65vmax at 25% 70%, rgba(79,70,229,.5) 0%, rgba(79,70,229,0) 60%),
+    radial-gradient(50vmax 50vmax at 90% 92%, rgba(219,39,119,.3) 0%, rgba(219,39,119,0) 60%),
+    linear-gradient(165deg, #2B1460 0%, #170B36 50%, #06040E 100%);
 }
-@media (prefers-color-scheme: dark) {
-  :root[data-skin="glass"] body::before {
-    background:
-      radial-gradient(60vmax 60vmax at 5% 4%, rgba(91,33,182,.6) 0%, rgba(91,33,182,0) 60%),
-      radial-gradient(55vmax 55vmax at 100% 22%, rgba(157,23,77,.45) 0%, rgba(157,23,77,0) 60%),
-      radial-gradient(65vmax 65vmax at 15% 62%, rgba(29,78,216,.5) 0%, rgba(29,78,216,0) 60%),
-      radial-gradient(55vmax 55vmax at 95% 95%, rgba(15,118,110,.4) 0%, rgba(15,118,110,0) 60%),
-      #0A0A18;
-  }
+/* กระจกโหมดสว่าง */
+:root[data-skin="glass"][data-gmode="light"] {
+  color-scheme: light;
+  --bg: #F1EDFC; --surface: rgba(255,255,255,.5); --surface2: rgba(255,255,255,.55); --text: #1B1A2E; --text2: #57546E;
+  --line: rgba(255,255,255,.75); --accent: #5B4CF0; --accent-soft: rgba(91,76,240,.16);
+  --danger: #D93A40; --danger-soft: rgba(229,72,77,.14); --warn: #A35208; --warn-soft: rgba(245,158,11,.18);
+  --g-tint: rgba(255,255,255,.5); --g-shade: rgba(255,255,255,0); --g-edge: rgba(255,255,255,.95); --g-sheen: rgba(255,255,255,.35);
 }
-:root[data-skin="glass"] .card, :root[data-skin="glass"] .chip, :root[data-skin="glass"] .cls,
-:root[data-skin="glass"] .slide, :root[data-skin="glass"] .tile, :root[data-skin="glass"] .icon-btn,
-:root[data-skin="glass"] .status, :root[data-skin="glass"] textarea, :root[data-skin="glass"] .banner,
-:root[data-skin="glass"] .lunch {
-  -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
-  background-image: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0));
+:root[data-skin="glass"][data-gmode="light"][data-glass="clear"] { --g-tint: rgba(255,255,255,.18); }
+:root[data-skin="glass"][data-gmode="light"][data-glass="blur"] { --g-tint: rgba(255,255,255,.32); }
+:root[data-skin="glass"][data-gmode="light"] { background-color: #F1EDFC; }
+:root[data-skin="glass"][data-gmode="light"] body::before {
+  background:
+    radial-gradient(62vmax 62vmax at 10% 14%, rgba(196,181,253,.75) 0%, rgba(196,181,253,0) 60%),
+    radial-gradient(55vmax 55vmax at 95% 36%, rgba(249,168,212,.55) 0%, rgba(249,168,212,0) 60%),
+    radial-gradient(62vmax 62vmax at 22% 70%, rgba(147,197,253,.55) 0%, rgba(147,197,253,0) 60%),
+    radial-gradient(50vmax 50vmax at 88% 92%, rgba(253,230,138,.4) 0%, rgba(253,230,138,0) 60%),
+    linear-gradient(165deg, #F1EBFF 0%, #E6E1FA 50%, #FBF6FF 100%);
 }
-:root[data-skin="glass"] .chip.sel { background-color: var(--accent); }
-:root[data-skin="glass"] .hero {
-  background: linear-gradient(135deg, rgba(43,39,128,.85), rgba(124,58,237,.78));
-  border: 1px solid rgba(255,255,255,.35);
-  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+:root[data-skin="glass"][data-gmode="light"] #app { text-shadow: none; }
+:root[data-skin="glass"][data-gmode="light"] .chip.sel { background: var(--accent); border-color: var(--accent); }
+:root[data-skin="glass"][data-gmode="light"] .chip.sel, :root[data-skin="glass"][data-gmode="light"] .chip.sel .n, :root[data-skin="glass"][data-gmode="light"] .chip.sel .n.off,
+:root[data-skin="glass"][data-gmode="light"] .chip.sel .n.red, :root[data-skin="glass"][data-gmode="light"] .accent-pill,
+:root[data-skin="glass"][data-gmode="light"] .btn, :root[data-skin="glass"][data-gmode="light"] .seg button.on { color: #fff; }
+:root[data-skin="glass"][data-gmode="light"] .chip.today, :root[data-skin="glass"][data-gmode="light"] .cls.now { border-color: var(--accent); }
+:root[data-skin="glass"][data-gmode="light"] .hero {
+  background: linear-gradient(135deg, rgba(43,39,128,.82), rgba(124,58,237,.74)); color: #fff;
 }
+:root[data-skin="glass"][data-gmode="light"] .pick { background: rgba(30,20,60,.25); }
+:root[data-skin="glass"] .card,
+:root[data-skin="glass"] .chip,
+:root[data-skin="glass"] .cls,
+:root[data-skin="glass"] .slide,
+:root[data-skin="glass"] .tile,
+:root[data-skin="glass"] .icon-btn,
+:root[data-skin="glass"] .status,
+:root[data-skin="glass"] textarea,
+:root[data-skin="glass"] .banner,
+:root[data-skin="glass"] .lunch,
+:root[data-skin="glass"] .cd,
+:root[data-skin="glass"] .re,
+:root[data-skin="glass"] .hero,
+:root[data-skin="glass"] .pick-card,
+:root[data-skin="glass"] .onb-card {
+  background: linear-gradient(180deg, var(--g-sheen), rgba(255,255,255,0) 55%), linear-gradient(var(--g-shade), var(--g-shade)), var(--g-tint);
+  -webkit-backdrop-filter: blur(var(--g-blur)) saturate(var(--g-sat)); backdrop-filter: blur(var(--g-blur)) saturate(var(--g-sat));
+  border: 1px solid rgba(255,255,255,.2);
+  box-shadow: inset 0 1px 0 var(--g-edge), inset 1px 0 0 rgba(255,255,255,.16), inset 0 -1px 0 rgba(255,255,255,.06), 0 10px 30px rgba(0,0,0,.18);
+  color: var(--text);
+}
+:root[data-skin="glass"] .hero .soft { color: rgba(255,255,255,.86); }
+:root[data-skin="glass"] #app { text-shadow: 0 1px 2px rgba(0,0,0,.22); }
+:root[data-skin="glass"] .chip.sel, :root[data-skin="glass"] .btn, :root[data-skin="glass"] .seg button.on, :root[data-skin="glass"] .accent-pill { text-shadow: none; }
+:root[data-skin="glass"] .chip.today, :root[data-skin="glass"] .cls.now { border: 2px solid rgba(255,255,255,.85); }
+:root[data-skin="glass"] .chip.sel { background: #fff; border-color: #fff; box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+:root[data-skin="glass"] .chip.sel, :root[data-skin="glass"] .chip.sel .n, :root[data-skin="glass"] .chip.sel .n.off, :root[data-skin="glass"] .chip.sel .n.red,
+:root[data-skin="glass"] .accent-pill, :root[data-skin="glass"] .btn, :root[data-skin="glass"] .seg button.on { color: #1D1B2C; }
+:root[data-skin="glass"] .switch input:checked + span { background: #34C759; }
+:root[data-skin="glass"] .pick { background: rgba(0,0,0,.3); }
 
 /* นับถอยหลัง */
 .cd-row { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
@@ -247,7 +284,6 @@ select { appearance: none; -webkit-appearance: none; border-radius: 14px; paddin
 .onb-card p { margin: 0 0 16px; color: var(--text2); }
 .onb-m { width: 150px; height: 150px; margin: 0 auto; border-radius: 50%; background: linear-gradient(135deg, var(--hero1), var(--hero2)); display: grid; place-items: center; }
 .onb-m .mascot { width: 130px; height: 130px; }
-:root[data-skin="glass"] .cd, :root[data-skin="glass"] .re { -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%); }
 
 /* ธีมฮาโลวีน (มืดเสมอ) */
 :root[data-skin="halloween"] {
