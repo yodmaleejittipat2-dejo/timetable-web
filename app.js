@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var C = window.TT_CONFIG || {};
-  var WEB_VERSION = "web-10";
+  var WEB_VERSION = "web-11";
   var app = document.getElementById("app");
   var SKINS = ["normal", "glass", "glass-clear", "glass-blur", "halloween"];
   function applySkin(v) {
@@ -352,9 +352,28 @@
     var v = document.createElement("div");
     v.className = "viewer";
     v.innerHTML = (p.media_type === "video"
-      ? '<video src="' + esc(p.media_url) + '" controls autoplay playsinline></video>'
+      ? '<video src="' + esc(p.media_url) + '" controls autoplay playsinline preload="auto"' + (p.thumb_url ? ' poster="' + esc(p.thumb_url) + '"' : '') + '></video>' +
+        '<div class="vmsg">กำลังโหลดวิดีโอ…</div>'
       : '<img src="' + esc(p.media_url) + '" alt="">') + '<button class="close" aria-label="ปิด">✕</button>';
     v.querySelector(".close").onclick = function () { v.remove(); };
+    var vid = v.querySelector("video"), msg = v.querySelector(".vmsg");
+    if (vid) {
+      var hide = function () { msg.style.display = "none"; };
+      vid.addEventListener("playing", hide);
+      vid.addEventListener("canplay", hide);
+      vid.addEventListener("waiting", function () { msg.textContent = "กำลังโหลดวิดีโอ…"; msg.style.display = ""; });
+      vid.addEventListener("progress", function () {
+        try {
+          if (vid.duration && vid.buffered.length) msg.textContent = "กำลังโหลดวิดีโอ " + Math.min(100, Math.round(vid.buffered.end(vid.buffered.length - 1) / vid.duration * 100)) + "%";
+        } catch (e) {}
+      });
+      vid.addEventListener("error", function () {
+        msg.innerHTML = 'เล่นวิดีโอไม่ได้ · <a href="' + esc(p.media_url) + '" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline">เปิดไฟล์โดยตรง</a>';
+        msg.style.display = ""; msg.style.pointerEvents = "auto";
+      });
+      var p0 = vid.play && vid.play();
+      if (p0 && p0.catch) p0.catch(function () { msg.textContent = "แตะปุ่มเล่นเพื่อดูวิดีโอ"; });
+    }
     document.body.appendChild(v);
   }
   function postById(id) { return S.posts.filter(function (p) { return String(p.id) === String(id); })[0]; }
