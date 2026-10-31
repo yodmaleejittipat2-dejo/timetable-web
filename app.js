@@ -2,9 +2,9 @@
 (function () {
   "use strict";
   var C = window.TT_CONFIG || {};
-  var WEB_VERSION = "web-11";
+  var WEB_VERSION = "web-12";
   var app = document.getElementById("app");
-  var SKINS = ["normal", "glass", "glass-clear", "glass-blur", "halloween"];
+  var SKINS = ["normal", "glass", "glass-clear", "glass-blur", "halloween", "christmas"];
   function applySkin(v) {
     v = SKINS.indexOf(v) >= 0 ? v : "normal";
     var k = v.indexOf("glass") === 0 ? "glass" : v;
@@ -14,10 +14,11 @@
     var gm = "dark";
     try { gm = localStorage.getItem("tt_gmode") === "light" ? "light" : "dark"; } catch (e) {}
     de.setAttribute("data-gmode", gm);
+    if (window.SnowFX) { if (k === "christmas") { if (document.body) window.SnowFX.start(); else document.addEventListener("DOMContentLoaded", function () { if (de.getAttribute("data-skin") === "christmas") window.SnowFX.start(); }); } else window.SnowFX.stop(); }
     var tc = document.querySelectorAll('meta[name="theme-color"]');
     for (var i = 0; i < tc.length; i++) {
       if (!tc[i].getAttribute("data-orig")) tc[i].setAttribute("data-orig", tc[i].getAttribute("content"));
-      tc[i].setAttribute("content", k === "halloween" ? "#0E0620" : k === "glass" ? (gm === "light" ? "#F1EDFC" : "#170B36") : tc[i].getAttribute("data-orig"));
+      tc[i].setAttribute("content", k === "halloween" ? "#0E0620" : k === "christmas" ? "#061224" : k === "glass" ? (gm === "light" ? "#F1EDFC" : "#170B36") : tc[i].getAttribute("data-orig"));
     }
   }
   try { applySkin(localStorage.getItem("tt_skin")); } catch (e) { applySkin("normal"); }
@@ -455,7 +456,7 @@
       getMascot().setMood(mood);
       h += '<div class="hero" id="hero"><div class="row"><div class="grow soft small">' + DAY_FULL[dow(today)] + " " + dLong(today) + '</div></div>' +
         '<div class="row" style="align-items:center;gap:8px"><div id="mascot-slot" class="mascot-slot"></div>' +
-        '<div class="grow"><span class="pill" style="margin-top:0">' + (document.documentElement.getAttribute("data-skin") === "halloween" ? "👻 น้องติ๊กผีน้อย" : "น้องติ๊ก") + '</span>' +
+        '<div class="grow"><span class="pill" style="margin-top:0">' + (document.documentElement.getAttribute("data-skin") === "halloween" ? "👻 น้องติ๊กผีน้อย" : document.documentElement.getAttribute("data-skin") === "christmas" ? "🎅 น้องติ๊กซานต้า" : "น้องติ๊ก") + '</span>' +
         '<div class="say">' + esc(say) + '</div>' + (saySub ? '<div class="soft">' + esc(saySub) + '</div>' : '') + '</div></div>' +
         (spPill ? '<div style="margin-top:8px">' + spPill + '</div>' : '') +
         (prog >= 0 ? '<div class="bar"><i style="width:' + Math.max(2, Math.min(100, prog * 100)) + '%"></i></div>' : '') +
@@ -528,9 +529,19 @@
   var mascotObj = null;
   var tapPhrase = "", tapUntil = 0;
   var SPOOKY = ["Trick or Treat! 🎃", "ขอขนมหน่อยน้า~ 🍬", "บู้ววว~ ตกใจไหม 👻", "ไม่ให้ขนม หลอกนะ! 😈", "ชุดผีน่ารักไหม? 👻", "ถังขนมยังไม่เต็มเลย 🍭", "แฮปปี้ฮาโลวีน! 🦇", "ผีน้อยตั้งใจเรียนนะ 📚"];
+  var XMAS = ["Merry Christmas! 🎄", "ปั้นตุ๊กตาหิมะกัน ⛄", "ระวังลูกหิมะ! ❄️", "โฮ่ โฮ่ โฮ่ 🎅", "ขอของขวัญได้ไหม 🎁", "หนาวจัง~ 🧣", "ตั้งใจเรียนนะ เดี๋ยวซานต้ามา!", "Happy New Year 2027! ✨"];
   var PHRASES = ["สู้ๆ นะ! 💪", "เก่งมากเลย!", "อย่าลืมดื่มน้ำนะ 💧", "ง่วงจัง~ 😪", "ติ๊กๆ ต็อกๆ ⏰", "วันนี้ก็สู้ต่อไป!", "ยิ้มหน่อย 😊", "เดี๋ยวเตือนให้เองนะ!", "จั๊กจี้! 🤭"];
   function getMascot() {
-    if (!mascotObj) mascotObj = window.Mascot ? new window.Mascot() : { canvas: document.createElement("div"), setMood: function () {}, jump: function () {} };
+    if (!mascotObj) {
+      mascotObj = window.Mascot ? new window.Mascot() : { canvas: document.createElement("div"), setMood: function () {}, jump: function () {}, throwNow: function () {} };
+      // ลูกหิมะลอยออกจากมือน้องติ๊กไปแตกบนจอ
+      mascotObj.onThrow = function () {
+        var cv = mascotObj.canvas;
+        if (!window.SnowFX || !cv.isConnected) return;
+        var r = cv.getBoundingClientRect();
+        window.SnowFX.splat(r.left + r.width * 0.75, r.top + r.height * 0.45);
+      };
+    }
     return mascotObj;
   }
   var suppressClick = false;
@@ -562,7 +573,9 @@
       el.addEventListener("click", function () {
         if (suppressClick) return;
         getMascot().jump();
-        var opts = (document.documentElement.getAttribute("data-skin") === "halloween" ? SPOOKY : PHRASES).filter(function (p) { return p !== tapPhrase; });
+        var sk = document.documentElement.getAttribute("data-skin");
+        if (sk === "christmas" && getMascot().throwNow) getMascot().throwNow();
+        var opts = (sk === "halloween" ? SPOOKY : sk === "christmas" ? XMAS : PHRASES).filter(function (p) { return p !== tapPhrase; });
         tapPhrase = opts[Math.floor(Math.random() * opts.length)];
         tapUntil = Date.now() + 2600;
         renderHome();
@@ -860,7 +873,7 @@
   }
 
   // ---------------- ตั้งค่า ----------------
-  var SKIN_NAME = { normal: "ปกติ", glass: "กระจกฝ้า", "glass-clear": "กระจกใส", "glass-blur": "กระจกเบลอ", halloween: "🎃 ฮาโลวีน" };
+  var SKIN_NAME = { normal: "ปกติ", glass: "กระจกฝ้า", "glass-clear": "กระจกใส", "glass-blur": "กระจกเบลอ", halloween: "🎃 ฮาโลวีน 2026", christmas: "🎄 Christmas 2026" };
   /** เลือกโหมดของธีมกระจก */
   function pickGlassMode(cur) {
     var old = document.querySelector(".pick");
@@ -889,7 +902,8 @@
     ["glass", "กระจกฝ้า", "ขุ่นนุ่ม อ่านง่ายที่สุด"],
     ["glass-clear", "กระจกใส", "เห็นภาพด้านหลังชัด ขอบสะท้อนแสง"],
     ["glass-blur", "กระจกเบลอ", "เบลอกลางๆ โทนเข้มนุ่ม"],
-    ["halloween", "🎃 ฮาโลวีน", "คืนพระจันทร์เต็มดวง น้องติ๊กแต่งชุดผี"]
+    ["halloween", "🎃 ฮาโลวีน 2026", "คืนพระจันทร์เต็มดวง น้องติ๊กแต่งชุดผี"],
+    ["christmas", "🎄 Christmas 2026", "หิมะตก น้องติ๊กปั้นตุ๊กตาหิมะ ปาลูกหิมะใส่จอ"]
   ];
   /** หน้าต่างเลือกรูปแบบการตกแต่ง */
   function pickSkin(cur) {

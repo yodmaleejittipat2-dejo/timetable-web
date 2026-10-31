@@ -22,6 +22,9 @@
     this.mood = "study";
     this.moodStart = performance.now();
     this.jumpAt = -1e9;
+    this.throwAt = -1e9;
+    this.lastFired = null;
+    this.onThrow = null;
     this.last = 0;
     var self = this;
     function loop(ts) {
@@ -38,6 +41,8 @@
     if (m !== this.mood) { this.mood = m; this.moodStart = performance.now(); }
   };
   Mascot.prototype.jump = function () { this.jumpAt = performance.now(); };
+  /** ปาลูกหิมะเดี๋ยวนี้ (ธีมคริสต์มาส) */
+  Mascot.prototype.throwNow = function () { this.throwAt = performance.now(); };
 
   Mascot.prototype.draw = function (ts) {
     var cv = this.canvas, c = this.ctx;
@@ -64,6 +69,7 @@
 
     c.save();
     c.translate(0, bob - jump * 10);
+    if (document.documentElement.getAttribute("data-skin") === "christmas") { EYE = INK; xmas(this, c, mood, tt, t, ts); c.restore(); return; }
     var costume = document.documentElement.getAttribute("data-skin") === "halloween";
     EYE = costume ? "#fff" : INK;
     if (costume) { ghost(c, mood, tt, t); c.restore(); return; }
@@ -299,6 +305,136 @@
       c.fillStyle = cols[i % cols.length]; c.fillRect(-1.6, -0.9, 3.2, 1.8); c.restore();
     }
   }
+  // ---------- คริสต์มาส: ปั้นตุ๊กตาหิมะ / ปาลูกหิมะ / ถือของขวัญ ----------
+  function xmas(self, c, mood, tt, t, ts) {
+    var manualK = (ts - self.throwAt) / 1100, cyc = tt % 15, round = Math.floor(tt / 15), sleep = mood === "sleep";
+    var throwK = -1, throwId = null;
+    if (manualK >= 0 && manualK <= 1) { throwK = manualK; throwId = "m" + self.throwAt; }
+    else if (!sleep && cyc >= 6 && cyc <= 7.1) { throwK = (cyc - 6) / 1.1; throwId = round + "a"; }
+    else if (!sleep && cyc >= 8.2 && cyc <= 9.3) { throwK = (cyc - 8.2) / 1.1; throwId = round + "b"; }
+    var action = throwK >= 0 ? 2 : sleep ? 0 : cyc < 6 ? 1 : cyc >= 10.5 ? 3 : 4;
+    if (throwK >= 0.55 && throwId !== self.lastFired) { self.lastFired = throwId; if (self.onThrow) setTimeout(self.onThrow, 0); }
+    snowman(c, action === 1 ? cyc / 6 : 1);
+    c.save(); c.translate(9, 0);
+    c.fillStyle = DARK; oval(c, 39.5, 86, 6.5, 4); oval(c, 60.5, 86, 6.5, 4);
+    if (action === 0) { arm(c, 27, 62, 23, 72); arm(c, 73, 62, 77, 72); }
+    else if (action === 1) arm(c, 27, 62, 14 + sin(tt * 8) * 2, 70 + Math.abs(sin(tt * 8)) * 3);
+    body(c); scarf(c, tt); face(c, mood, tt, t); santaHat(c, tt);
+    if (action === 2) throwArm(c, throwK);
+    else if (action === 3) giftBox(c, tt);
+    else if (action === 4) { arm(c, 73, 62, 79, 70); sball(c, 80, 70, 4, 1); }
+    else if (action === 0) zzz(c, tt);
+    c.restore();
+  }
+  function santaHat(c, tt) {
+    var sw = sin(tt * 2.2) * 3;
+    c.fillStyle = "#D7263D"; c.beginPath(); c.moveTo(31, 37); c.bezierCurveTo(36, 18, 52, 10, 66 + sw, 14); c.quadraticCurveTo(72 + sw, 20, 70, 37); c.closePath(); c.fill();
+    c.fillStyle = "rgba(0,0,0,.2)"; oval(c, 62.5, 28.5, 7.5, 8.5);
+    c.fillStyle = "#fff"; c.beginPath(); c.roundRect ? c.roundRect(28, 32, 44, 9, 5) : c.rect(28, 32, 44, 9); c.fill();
+    circle(c, 67 + sw, 13.5, 4.3);
+  }
+  function scarf(c, tt) {
+    c.fillStyle = "#1F8A70"; c.beginPath(); c.roundRect ? c.roundRect(28, 70, 44, 7.5, 4) : c.rect(28, 70, 44, 7.5); c.fill();
+    c.save(); c.translate(62, 76); c.rotate(sin(tt * 3) * 6 * PI / 180); c.translate(-62, -76);
+    c.fillRect(58, 75, 8, 15); c.fillStyle = "#EAF4F1"; c.fillRect(58, 81, 8, 1.6); c.fillRect(58, 85.5, 8, 1.5); c.restore();
+    c.fillStyle = "#EAF4F1"; c.fillRect(38, 70, 2, 7.5); c.fillRect(46, 70, 2, 7.5);
+  }
+  function sball(c, x, y, r, a) {
+    c.fillStyle = "rgba(255,255,255," + a + ")"; circle(c, x, y, r);
+    c.fillStyle = "rgba(120,160,200," + (a / 3) + ")"; circle(c, x + r * 0.3, y + r * 0.3, r * 0.55);
+  }
+  function throwArm(c, k) {
+    var deg = k < 0.55 ? 20 + (-160) * ease(k / 0.55) : -140 + 190 * ease((k - 0.55) / 0.25);
+    var rad = deg * PI / 180, hx = 73 + cos(rad) * 15, hy = 60 + sin(rad) * 15;
+    arm(c, 73, 60, hx, hy);
+    if (k < 0.55) sball(c, hx, hy - 3, 4.5, 1);
+    else { var kk = Math.min(1, (k - 0.55) / 0.45); sball(c, hx + (41 - hx) * kk, hy + (40 - hy) * kk - sin(kk * PI) * 10, 4.5 + kk * 14, 1 - kk * 0.85); }
+  }
+  function giftBox(c, tt) {
+    var bob = -Math.abs(sin(tt * 3)) * 2;
+    arm(c, 30, 64, 41, 76 + bob); arm(c, 70, 64, 59, 76 + bob);
+    c.fillStyle = "#D7263D"; c.fillRect(39, 72 + bob, 22, 17);
+    c.fillStyle = "#FFD166"; c.fillRect(48.5, 72 + bob, 3, 17); c.fillRect(39, 78 + bob, 22, 3);
+    circle(c, 46.5, 70.5 + bob, 2.8); circle(c, 53.5, 70.5 + bob, 2.8);
+    var sp = (tt * 2) % 1; c.fillStyle = "rgba(255,236,160," + (1 - sp) + ")"; circle(c, 64, 70 - sp * 10 + bob, 1.6);
+  }
+  function snowman(c, k) {
+    function part(a, b) { return ease((k - a) / (b - a)); }
+    var b1 = part(0, 0.25), b2 = part(0.25, 0.45), b3 = part(0.45, 0.6), det = part(0.6, 0.78), x = 12;
+    c.fillStyle = "rgba(0,0,0,.15)"; oval(c, x, 92, 9, 2);
+    function ball(cy, r, p) { if (p <= 0) return; c.fillStyle = "#fff"; circle(c, x, cy + (1 - p) * 4, r * p); c.fillStyle = "rgba(91,141,184,.16)"; circle(c, x + r * 0.35 * p, cy + r * 0.3 * p, r * 0.6 * p); }
+    ball(85, 7.5, b1); ball(73.5, 5.6, b2); ball(64.5, 4.4, b3);
+    if (det > 0) {
+      c.globalAlpha = det;
+      c.fillStyle = INK; circle(c, x - 1.5, 63.8, 0.7); circle(c, x + 1.5, 63.8, 0.7); circle(c, x, 72, 0.8); circle(c, x, 75, 0.8);
+      c.fillStyle = "#FF8C28"; c.beginPath(); c.moveTo(x, 65); c.lineTo(x + 4.5 * det, 65.8); c.lineTo(x, 66.5); c.closePath(); c.fill();
+      c.strokeStyle = "#6E4628"; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(x - 5, 72); c.lineTo(x - 5 - 5 * det, 68); c.stroke();
+      c.beginPath(); c.moveTo(x + 5, 72); c.lineTo(x + 5 + 4 * det, 68.5); c.stroke();
+      c.fillStyle = "#D7263D"; c.beginPath(); c.arc(x, 62.5, 4, PI, 2 * PI); c.fill();
+      c.fillStyle = "#fff"; circle(c, x, 58.6, 1.2);
+      c.globalAlpha = 1;
+    }
+  }
+
+  // ---------- หิมะตก + ลูกหิมะแตกใส่จอ ----------
+  var Snow = { cv: null, ctx: null, flakes: [], splats: [], on: false, last: 0 };
+  Snow.start = function () {
+    if (Snow.on) return;
+    Snow.on = true;
+    if (!Snow.cv) { Snow.cv = document.createElement("canvas"); Snow.cv.className = "snowfx"; Snow.ctx = Snow.cv.getContext("2d"); }
+    document.body.appendChild(Snow.cv);
+    Snow.last = 0;
+    requestAnimationFrame(Snow.loop);
+  };
+  Snow.stop = function () { Snow.on = false; if (Snow.cv && Snow.cv.parentNode) Snow.cv.parentNode.removeChild(Snow.cv); };
+  Snow.splat = function (fx, fy) {
+    if (!Snow.on) return;
+    var w = innerWidth, h = innerHeight;
+    Snow.splats.push({ x: w * (0.2 + Math.random() * 0.6), y: h * (0.25 + Math.random() * 0.45), fx: fx, fy: fy, t0: performance.now(), seed: Math.random() * 1e6 });
+    if (Snow.splats.length > 6) Snow.splats.shift();
+  };
+  Snow.loop = function (ts) {
+    if (!Snow.on) return;
+    requestAnimationFrame(Snow.loop);
+    if (document.hidden) return;
+    var cv = Snow.cv, c = Snow.ctx, dpr = Math.min(devicePixelRatio || 1, 2), w = innerWidth, h = innerHeight;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    var dt = Snow.last ? Math.min(0.05, (ts - Snow.last) / 1000) : 0; Snow.last = ts;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
+    if (!Snow.flakes.length) for (var i = 0; i < 60; i++) Snow.flakes.push({ x: Math.random() * w, y: Math.random() * h, r: 1.2 + Math.random() * 2.6, sp: 22 + Math.random() * 40, dr: 6 + Math.random() * 14, ph: Math.random() * 6.28 });
+    var tt = ts / 1000;
+    Snow.flakes.forEach(function (f) {
+      f.y += f.sp * dt * (f.r / 2.5);
+      if (f.y > h + 10) { f.y = -10; f.x = Math.random() * w; }
+      c.fillStyle = "rgba(255,255,255," + Math.min(0.92, 0.47 + f.r * 0.15) + ")";
+      c.beginPath(); c.arc(f.x + sin(tt * 0.8 + f.ph) * f.dr, f.y, f.r, 0, PI * 2); c.fill();
+    });
+    Snow.splats = Snow.splats.filter(function (s) { return (ts - s.t0) / 1000 < 4.6; });
+    Snow.splats.forEach(function (s) {
+      var age = (ts - s.t0) / 1000;
+      if (age < 0.38) {
+        var k = age / 0.38, x = s.fx + (s.x - s.fx) * k, y = s.fy + (s.y - s.fy) * k - sin(k * PI) * 60, r = 6 + k * k * 34;
+        var g = c.createRadialGradient(x - r * 0.3, y - r * 0.3, 0, x, y, r * 1.2); g.addColorStop(0, "#fff"); g.addColorStop(1, "#C9DEEE");
+        c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, PI * 2); c.fill();
+      } else {
+        var a = age < 3.2 ? 1 : Math.max(0, 1 - (age - 3.2) / 1.4), pop = Math.min(1, (age - 0.38) / 0.12), slide = (age - 0.38) * 7;
+        splat(c, s.x, s.y + slide, 46, s.seed, a, pop);
+      }
+    });
+  };
+  function splat(c, x, y, r, seed, a, pop) {
+    var rnd = seed; function R() { rnd = (rnd * 9301 + 49297) % 233280; return rnd / 233280; }
+    var rs = r * (0.7 + 0.3 * pop);
+    c.fillStyle = "rgba(40,80,120," + a * 0.25 + ")"; c.beginPath(); c.arc(x + 3, y + 4, rs, 0, PI * 2); c.fill();
+    c.fillStyle = "rgba(245,250,255," + a + ")";
+    c.beginPath(); c.arc(x, y, rs, 0, PI * 2); c.fill();
+    for (var i = 0; i < 10; i++) { var an = R() * 6.28, d = rs * (0.8 + R() * 0.75) * pop; c.beginPath(); c.arc(x + cos(an) * d, y + sin(an) * d, rs * (0.12 + R() * 0.22), 0, PI * 2); c.fill(); }
+    for (var j = 0; j < 3; j++) { var dx = (R() * 2 - 1) * rs * 0.7, len = rs * (0.4 + R() * 0.6) * pop; c.fillRect(x + dx - rs * 0.1, y, rs * 0.2, rs * 0.6 + len); }
+    c.fillStyle = "rgba(255,255,255," + a * 0.9 + ")"; c.beginPath(); c.arc(x - rs * 0.35, y - rs * 0.35, rs * 0.22, 0, PI * 2); c.fill();
+  }
+  window.SnowFX = Snow;
+
   // ---------- ชุดผีฮาโลวีน ----------
   function ghost(c, mood, tt, t) {
     bat(c, 16 + sin(tt * 0.9) * 6, 22 + sin(tt * 1.7) * 4, 7, tt * 13);
