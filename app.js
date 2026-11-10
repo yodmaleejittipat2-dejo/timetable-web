@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var C = window.TT_CONFIG || {};
-  var WEB_VERSION = "web-12";
+  var WEB_VERSION = "web-13";
   var app = document.getElementById("app");
   var SKINS = ["normal", "glass", "glass-clear", "glass-blur", "halloween", "christmas"];
   function applySkin(v) {
@@ -201,6 +201,14 @@
     S.cfg = parseConfig(raw);
     S.blocks = buildBlocks(S.cfg, S.cfg.periods);
     S.cfg.special.forEach(function (sp) { sp.blocks = buildBlocks(S.cfg, sp.periods); });
+    // สลับวันเรียน: วันที่นี้เรียนตามตารางของวันอื่น
+    S.cfg.swaps = ((raw && raw.swaps) || []).map(function (x) {
+      var d = parseDate(x.d), w = +x.w;
+      return d && w >= 1 && w <= 5 ? { date: d, day: w, note: x.n || "" } : null;
+    }).filter(Boolean);
+  }
+  function swapOn(d) {
+    return (S.cfg.swaps || []).filter(function (x) { return sameDay(x.date, d); })[0] || null;
   }
   try { setConfig(JSON.parse(store("tt_cfg") || "null")); } catch (e) { setConfig(null); }
   try { S.posts = JSON.parse(store("tt_posts") || "[]"); } catch (e) { S.posts = []; }
@@ -217,7 +225,7 @@
   }
   /** ตารางของวันที่นั้นจริงๆ (ใช้เวลาลดถ้าเป็นวันลดเวลาเรียน) */
   function blocksOn(d) {
-    var k = dow(d);
+    var sw = swapOn(d), k = sw ? sw.day : dow(d);
     if (k > 5) return [];
     var sp = specialOn(d);
     return sp ? (sp.blocks[k - 1] || []) : blocks(k);
@@ -229,7 +237,7 @@
       if (d >= dayStart(h.start) && d <= dayStart(h.end)) return h.name;
     }
     if (d < cfg.termStart || d > cfg.termEnd) return "ปิดภาคเรียน";
-    if (dow(d) >= 6) return "วันหยุดสุดสัปดาห์";
+    if (dow(d) >= 6 && !swapOn(d)) return "วันหยุดสุดสัปดาห์";
     return null;
   }
   function bkey(b) { return b.code || b.name; }
@@ -449,6 +457,8 @@
 
     var spToday = off ? null : specialOn(today);
     var spPill = spToday ? '<span class="pill warn-pill">⏱ ' + esc(spToday.name) + ' · ' + spToday.label + '</span>' : '';
+    var swToday = off ? null : swapOn(today);
+    if (swToday) spPill = '<span class="pill warn-pill">🔄 เรียนตามตารางวัน' + DAY_FULL[swToday.day] + '</span>' + spPill;
     var heroMascot = store("tt_hero") === "mascot";
     var tDate = target ? (cur && !cur.lunch ? today : nx ? nx.date : today) : null;
     var tStr = tDate ? tDate.getFullYear() + "-" + pad(tDate.getMonth() + 1) + "-" + pad(tDate.getDate()) : "";
@@ -508,9 +518,9 @@
     // แถบวัน
     var dates = weekDates();
     h += '<div class="chips">' + dates.map(function (d, i) {
-      var k = i + 1, o = dayOff(d), red = !o && specialOn(d);
+      var k = i + 1, o = dayOff(d), red = !o && specialOn(d), sw = !o && swapOn(d);
       return '<button class="chip' + (k === S.day ? " sel" : "") + (sameDay(d, today) ? " today" : "") + '" data-day="' + k + '">' +
-        '<div class="d">' + DAY_SHORT[k] + '</div><div class="n' + (o ? " off" : red ? " red" : "") + '">' + (o ? "หยุด" : red ? "ลดเวลา" : d.getDate()) + '</div></button>';
+        '<div class="d">' + DAY_SHORT[k] + '</div><div class="n' + (o ? " off" : (red || sw) ? " red" : "") + '">' + (o ? "หยุด" : sw ? "ตาราง " + DAY_SHORT[sw.day] : red ? "ลดเวลา" : d.getDate()) + '</div></button>';
     }).join("") + '</div>';
     h += '<div id="list">' + listHtml() + '</div>';
 
@@ -615,6 +625,9 @@
     if (list.length) h += '<div class="small muted">' + list.filter(function (b) { return !b.lunch; }).length + " วิชา · " + hm(list[0].start) + "–" + hm(list[list.length - 1].end) + '</div>';
     h += '</div>';
     if (off) h += '<div class="banner"><div class="b">วันหยุด · ' + esc(off) + '</div><div class="small muted">วันนี้จะไม่มีการแจ้งเตือน</div></div>';
+    var swp = off ? null : swapOn(date);
+    if (swp) h += '<div class="banner warnb"><div class="b">🔄 วัน' + DAY_FULL[dow(date)] + 'นี้เรียนตามตารางวัน' + DAY_FULL[swp.day] + '</div>' +
+      '<div class="small muted">' + (swp.note ? esc(swp.note) + ' · ' : '') + 'การแจ้งเตือนเปลี่ยนตามให้แล้ว</div></div>';
     if (sp && list.length) h += '<div class="banner warnb"><div class="b">⏱ ' + esc(sp.name) + ' · ' + sp.label + '</div>' +
       '<div class="small muted">เวลาเรียนวันนี้ไม่เหมือนปกติ เลิกเรียน ' + hm(list[list.length - 1].end) + ' น. · การแจ้งเตือนใช้เวลาใหม่ให้แล้ว</div></div>';
     var ds = date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate());
